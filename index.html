@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electronics Store</title>
+    <link href="style.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="spinner"></div>
+        <p>Loading Store...</p>
+    </div>
+
+    <!-- Admin Button (Hidden) -->
+    <button id="admin-btn" class="admin-btn">Admin</button>
+
+    <!-- Homepage Section -->
+    <section id="homepage" class="section active">
+        <div class="container">
+            <h1 class="animated-title">Store</h1>
+            <div class="store-image-container">
+                <img src="store.jpg" alt="Electronics Store" class="store-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div class="image-placeholder" style="display: none;">Store Image Placeholder</div>
+            </div>
+            <p class="store-description">
+                Welcome to our premium electronics store! 
+            </p>
+            <div class="category-buttons">
+                <button class="category-btn" data-section="fridges">Fridges</button>
+                <button class="category-btn" data-section="cloth-washers">Cloth Washers</button>
+                <button class="category-btn" data-section="acs">ACs</button>
+                <button class="category-btn" data-section="fans">Fans</button>
+                <button class="category-btn" data-section="dish-washers">Dish Washers</button>
+                <button class="category-btn" data-section="other">Other</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Category Sections -->
+    <section id="fridges" class="section category-section">
+        <div class="container">
+            <button class="back-btn">← Back to Home</button>
+            <h2>Fridges</h2>
+            <div id="fridges-selection" class="selection-display"></div>
+            <div class="products-grid">
+                <div class="product-card selectable" data-product="Premium Refrigerator" data-id="1001">
+                    <div class="product-image-placeholder">Fridge Image</div>
+                    <h3>Premium Refrigerator</h3>
+                </div>
+            </div>
+            <button id="fridges-finish-btn" class="finish-btn" style="display: none;">Finish</button>
+        </div>
+    </section>
+
+    <section id="cloth-washers" class="section category-section">
+        <div class="container">
+            <button class="back-btn">← Back to Home</button>
+            <h2>Cloth Washers</h2>
+            <div id="cloth-washers-selection" class="selection-display"></div>
+            <div class="products-grid">
+                <div class="product-card selectable" data-product="Front Load Washer" data-id="2001">
+                    <div class="product-image-placeholder">Washer Image</div>
+                    <h3>Front Load Washer</h3>
+                </div>
+            </div>
+            <button id="cloth-washers-finish-btn" class="finish-btn" style="display: none;">Finish</button>
+        </div>
+    </section>
+
+    <section id="acs" class="section category-section">
+        <div class="container">
+            <button class="back-btn">← Back to Home</button>
+            <h2>Air Conditioners</h2>
+            <div id="acs-selection" class="selection-display"></div>
+            <div class="products-grid">
+                <div class="product-card selectable" data-product="Split AC Unit" data-id="3001">
+                    <div class="product-image-placeholder">AC Image</div>
+                    <h3>Split AC Unit</h3>
+                </div>
+            </div>
+            <button id="acs-finish-btn" class="finish-btn" style="display: none;">Finish</button>
+        </div>
+    </section>
+
+    <section id="fans" class="section category-section">
+        <div class="container">
+            <button class="back-btn">← Back to Home</button>
+            <h2>Fans</h2>
+            <div id="fans-selection" class="selection-display"></div>
+            <div class="products-grid">
+                <div class="product-card selectable" data-product="Ceiling Fan" data-id="4001">
+                    <div class="product-image-placeholder">Fan Image</div>
+                    <h3>Ceiling Fan</h3>
+                </div>
+            </div>
+            <button id="fans-finish-btn" class="finish-btn" style="display: none;">Finish</button>
+        </div>
+    </section>
+
+    <section id="dish-washers" class="section category-section">
+        <div class="container">
+            <button class="back-btn">← Back to Home</button>
+            <h2>Dish Washers</h2>
+            <div id="dish-washers-selection" class="selection-display"></div>
+            <div class="products-grid">
+                <div class="product-card selectable" data-product="Built-in Dishwasher" data-id="5001">
+                    <div class="product-image-placeholder">Dishwasher Image</div>
+                    <h3>Built-in Dishwasher</h3>
+                </div>
+            </div>
+            <button id="dish-washers-finish-btn" class="finish-btn" style="display: none;">Finish</button>
+        </div>
+    </section>
+
+    <section id="other" class="section category-section">
+        <div class="container">
+            <button class="back-btn">← Back to Home</button>
+            <h2>Other Electronics</h2>
+            <div id="other-selection" class="selection-display"></div>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search for products (e.g., blender, toaster, etc.)" class="search-bar">
+                <div id="search-results" class="search-results"></div>
+            </div>
+            <div class="products-grid" id="other-products">
+                <div class="product-card selectable" data-product="High-Speed Blender" data-id="4152">
+                    <div class="product-image-placeholder">Blender Image</div>
+                    <h3>High-Speed Blender</h3>
+                </div>
+            </div>
+            <button id="finish-btn" class="finish-btn" style="display: none;">Finish</button>
+        </div>
+    </section>
+
+    <!-- Admin Panel -->
+    <section id="admin-panel" class="section admin-section">
+        <div class="container">
+            <button class="back-btn">← Back to Home</button>
+            <h2>🔐 Admin Panel</h2>
+            <div class="admin-content">
+                <div class="add-product-section">
+                    <h3>Add New Product</h3>
+                    <form id="product-form">
+                        <input type="text" id="product-name" placeholder="Product Name" required>
+                        <textarea id="product-description" placeholder="Product Description" required></textarea>
+                        <input type="file" id="product-image" accept="image/*" required>
+                        <div id="image-preview" class="image-preview"></div>
+                        <select id="product-category" required>
+                            <option value="">Select Category</option>
+                            <option value="fridges">Fridges</option>
+                            <option value="cloth-washers">Cloth Washers</option>
+                            <option value="acs">ACs</option>
+                            <option value="fans">Fans</option>
+                            <option value="dish-washers">Dish Washers</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <button type="submit" class="admin-btn-action">Add Product</button>
+                    </form>
+                </div>
+                <div class="remove-product-section">
+                    <h3>Remove Product</h3>
+                    <select id="remove-category" required>
+                        <option value="">Select Category</option>
+                        <option value="fridges">Fridges</option>
+                        <option value="cloth-washers">Cloth Washers</option>
+                        <option value="acs">ACs</option>
+                        <option value="fans">Fans</option>
+                        <option value="dish-washers">Dish Washers</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <select id="remove-product" required>
+                        <option value="">Select Product</option>
+                    </select>
+                    <button id="remove-btn" class="admin-btn-action remove-btn">Remove Product</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="script.js"></script>
+</body>
+</html>

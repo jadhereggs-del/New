@@ -1,0 +1,14 @@
+{
+  "name": "electronics-store",
+  "version": "1.0.0",
+  "description": "Dynamic electronics store website",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^2.0.2"
+  }
+}
