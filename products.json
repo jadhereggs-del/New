@@ -1,43 +1,15 @@
-
 {
-  "fridges": [
-    {
-      "name": "Premium Refrigerator",
-      "id": "",
-      "imageUrl": "/uploads/IMG_0365_1755881212908.jpeg"
-    }
-  ],
-  "cloth-washers": [
-    {
-      "name": "Front Load Washer",
-      "id": "2001",
-      "imageUrl": "/uploads/IMG_0366_1755881212908.jpeg"
-    }
-  ],
-  "acs": [
-    {
-      "name": "Split AC Unit",
-      "id": "3001",
-      "imageUrl": "/uploads/IMG_0367_1755881212908.jpeg"
-    }
-  ],
-  "fans": [
-    {
-      "name": "Ceiling Fan",
-      "id": "4001",
-      "imageUrl": "/uploads/IMG_0368_1755881212908.jpeg"
-    }
-  ],
-  "dish-washers": [
-    {
-      "name": "Built-in Dishwasher",
-      "id": "5001"
-    }
-  ],
+  "fridges": [],
+  "cloth-washers": [],
+  "acs": [],
+  "fans": [],
+  "dish-washers": [],
   "other": [
     {
-      "name": "High-Speed Blender",
-      "id": "4152"
+      "name": "E",
+      "id": "3113",
+      "description": "Ec",
+      "imageUrl": "/uploads/1755953742672-402138900.png"
     }
   ]
 }
