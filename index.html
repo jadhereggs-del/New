@@ -27,6 +27,14 @@
             <p class="store-description">
                 Welcome to our premium electronics store! 
             </p>
+            <div class="id-search-section">
+                <h3>Quick Product Search</h3>
+                <div class="search-container">
+                    <input type="text" id="homepage-id-search" placeholder="Enter Product ID to find any item" class="search-bar">
+                    <button id="homepage-search-btn" class="search-btn">Find Product</button>
+                </div>
+            </div>
+            
             <div class="category-buttons">
                 <button class="category-btn" data-section="fridges">Fridges</button>
                 <button class="category-btn" data-section="cloth-washers">Cloth Washers</button>
@@ -43,12 +51,12 @@
         <div class="container">
             <button class="back-btn">← Back to Home</button>
             <h2>Fridges</h2>
-            <div id="fridges-selection" class="selection-display"></div>
+            <div id="fridges-cart-section" class="cart-section">
+                <h3>Selected Items (<span id="fridges-cart-count">0</span>)</h3>
+                <div id="fridges-cart-items" class="cart-items"></div>
+                <button id="fridges-clear-cart" class="clear-btn" style="display: none;">Clear All</button>
+            </div>
             <div class="products-grid">
-                <div class="product-card selectable" data-product="Premium Refrigerator" data-id="1001">
-                    <div class="product-image-placeholder">Fridge Image</div>
-                    <h3>Premium Refrigerator</h3>
-                </div>
             </div>
             <button id="fridges-finish-btn" class="finish-btn" style="display: none;">Finish</button>
         </div>
@@ -58,12 +66,12 @@
         <div class="container">
             <button class="back-btn">← Back to Home</button>
             <h2>Cloth Washers</h2>
-            <div id="cloth-washers-selection" class="selection-display"></div>
+            <div id="cloth-washers-cart-section" class="cart-section">
+                <h3>Selected Items (<span id="cloth-washers-cart-count">0</span>)</h3>
+                <div id="cloth-washers-cart-items" class="cart-items"></div>
+                <button id="cloth-washers-clear-cart" class="clear-btn" style="display: none;">Clear All</button>
+            </div>
             <div class="products-grid">
-                <div class="product-card selectable" data-product="Front Load Washer" data-id="2001">
-                    <div class="product-image-placeholder">Washer Image</div>
-                    <h3>Front Load Washer</h3>
-                </div>
             </div>
             <button id="cloth-washers-finish-btn" class="finish-btn" style="display: none;">Finish</button>
         </div>
@@ -73,12 +81,12 @@
         <div class="container">
             <button class="back-btn">← Back to Home</button>
             <h2>Air Conditioners</h2>
-            <div id="acs-selection" class="selection-display"></div>
+            <div id="acs-cart-section" class="cart-section">
+                <h3>Selected Items (<span id="acs-cart-count">0</span>)</h3>
+                <div id="acs-cart-items" class="cart-items"></div>
+                <button id="acs-clear-cart" class="clear-btn" style="display: none;">Clear All</button>
+            </div>
             <div class="products-grid">
-                <div class="product-card selectable" data-product="Split AC Unit" data-id="3001">
-                    <div class="product-image-placeholder">AC Image</div>
-                    <h3>Split AC Unit</h3>
-                </div>
             </div>
             <button id="acs-finish-btn" class="finish-btn" style="display: none;">Finish</button>
         </div>
@@ -88,12 +96,12 @@
         <div class="container">
             <button class="back-btn">← Back to Home</button>
             <h2>Fans</h2>
-            <div id="fans-selection" class="selection-display"></div>
+            <div id="fans-cart-section" class="cart-section">
+                <h3>Selected Items (<span id="fans-cart-count">0</span>)</h3>
+                <div id="fans-cart-items" class="cart-items"></div>
+                <button id="fans-clear-cart" class="clear-btn" style="display: none;">Clear All</button>
+            </div>
             <div class="products-grid">
-                <div class="product-card selectable" data-product="Ceiling Fan" data-id="4001">
-                    <div class="product-image-placeholder">Fan Image</div>
-                    <h3>Ceiling Fan</h3>
-                </div>
             </div>
             <button id="fans-finish-btn" class="finish-btn" style="display: none;">Finish</button>
         </div>
@@ -103,12 +111,12 @@
         <div class="container">
             <button class="back-btn">← Back to Home</button>
             <h2>Dish Washers</h2>
-            <div id="dish-washers-selection" class="selection-display"></div>
+            <div id="dish-washers-cart-section" class="cart-section">
+                <h3>Selected Items (<span id="dish-washers-cart-count">0</span>)</h3>
+                <div id="dish-washers-cart-items" class="cart-items"></div>
+                <button id="dish-washers-clear-cart" class="clear-btn" style="display: none;">Clear All</button>
+            </div>
             <div class="products-grid">
-                <div class="product-card selectable" data-product="Built-in Dishwasher" data-id="5001">
-                    <div class="product-image-placeholder">Dishwasher Image</div>
-                    <h3>Built-in Dishwasher</h3>
-                </div>
             </div>
             <button id="dish-washers-finish-btn" class="finish-btn" style="display: none;">Finish</button>
         </div>
@@ -122,12 +130,15 @@
             <div class="search-container">
                 <input type="text" id="search-input" placeholder="Search for products (e.g., blender, toaster, etc.)" class="search-bar">
                 <div id="search-results" class="search-results"></div>
+                <input type="text" id="id-search-input" placeholder="Enter Product ID" class="search-bar">
+                <button id="id-search-btn" class="search-btn">Find by ID</button>
+            </div>
+            <div id="cart-section" class="cart-section">
+                <h3>Selected Items (<span id="cart-count">0</span>)</h3>
+                <div id="cart-items" class="cart-items"></div>
+                <button id="clear-cart" class="clear-btn" style="display: none;">Clear All</button>
             </div>
             <div class="products-grid" id="other-products">
-                <div class="product-card selectable" data-product="High-Speed Blender" data-id="4152">
-                    <div class="product-image-placeholder">Blender Image</div>
-                    <h3>High-Speed Blender</h3>
-                </div>
             </div>
             <button id="finish-btn" class="finish-btn" style="display: none;">Finish</button>
         </div>
