@@ -162,6 +162,41 @@ body {
     backdrop-filter: blur(10px);
 }
 
+/* ID Search Section */
+.id-search-section {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 2rem;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.id-search-section h3 {
+    color: white;
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.id-search-section .search-container {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.id-search-section .search-bar {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.id-search-section .search-btn {
+    margin-top: 0;
+    margin-left: 0;
+    white-space: nowrap;
+}
+
 /* Category Buttons */
 .category-buttons {
     display: grid;
@@ -352,6 +387,97 @@ body {
 .image-preview {
     margin: 10px 0;
     display: none;
+}
+
+/* Cart Section */
+.cart-section {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cart-section h3 {
+    color: white;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+.cart-items {
+    margin-bottom: 15px;
+}
+
+.cart-item {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+}
+
+.remove-item-btn {
+    background: #ff4757;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.remove-item-btn:hover {
+    background: #ff3838;
+    transform: scale(1.1);
+}
+
+.clear-btn {
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.clear-btn:hover {
+    background: #ff5252;
+    transform: translateY(-2px);
+}
+
+/* Search Button */
+.search-btn {
+    background: linear-gradient(135deg, #4ecdc4 0%, #3498db 100%);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-left: 10px;
+    margin-top: 10px;
+}
+
+.search-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Pulse animation for found products */
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 205, 196, 0.7); }
+    50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(76, 205, 196, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 205, 196, 0); }
 }
 
 .image-preview img {
@@ -546,6 +672,15 @@ body {
     
     .container {
         padding: 10px;
+    }
+    
+    .id-search-section .search-container {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .id-search-section .search-btn {
+        width: 100%;
     }
 }
 
