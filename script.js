@@ -48,15 +48,13 @@ function updateProductsDisplay() {
         const section = document.getElementById(category);
         const productsGrid = section.querySelector('.products-grid');
         
-        // Clear existing products except the first one (template)
+        // Clear all existing products
         const existingProducts = productsGrid.querySelectorAll('.product-card');
-        existingProducts.forEach((product, index) => {
-            if (index > 0) product.remove();
-        });
+        existingProducts.forEach(product => product.remove());
         
-        // Add products from backend
-        if (productsData[category] && productsData[category].length > 1) {
-            productsData[category].slice(1).forEach(product => {
+        // Add all products from backend
+        if (productsData[category] && productsData[category].length > 0) {
+            productsData[category].forEach(product => {
                 addProductToGrid(product, category);
             });
         }
