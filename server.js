@@ -6,14 +6,16 @@ const multer = require('multer');
 const app = express();
 const PORT = 5000;
 
-// Create uploads directory if it doesn't exist
-const UPLOADS_DIR = './uploads';
-fs.mkdir(UPLOADS_DIR, { recursive: true }).catch(() => {});
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!require('fs').existsSync(uploadsDir)) {
+    require('fs').mkdirSync(uploadsDir, { recursive: true });
+}
 
-// Configure multer for file uploads
+// Configure multer for local file storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, UPLOADS_DIR);
+        cb(null, 'uploads/');
     },
     filename: function (req, file, cb) {
         // Generate unique filename
@@ -84,31 +86,34 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Upload image endpoint
-app.post('/api/upload', upload.single('image'), (req, res) => {
+app.post('/api/upload', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No image file uploaded' });
         }
 
+        // File is already saved to uploads directory by multer
         const imageUrl = `/uploads/${req.file.filename}`;
+        
         res.json({ 
             success: true, 
             imageUrl: imageUrl,
             filename: req.file.filename
         });
     } catch (error) {
+        console.error('Upload error:', error);
         res.status(500).json({ error: 'Failed to upload image' });
     }
 });
 
-// Serve uploaded images
-app.use('/uploads', express.static(UPLOADS_DIR));
-
 // Add new product
 app.post('/api/products', async (req, res) => {
     try {
-        const { name, description, category, password, imageUrl } = req.body;
+        const { name, description, category, password, imageUrl, price } = req.body;
         
         // Verify password
         if (password !== '1234') {
@@ -131,22 +136,77 @@ app.post('/api/products', async (req, res) => {
             products[category] = [];
         }
 
-        products[category].push({
+        const newProduct = {
             name: name,
             id: newId.toString(),
             description: description || '',
-            imageUrl: imageUrl || null
-        });
+            imageUrl: imageUrl || null,
+            price: price || null
+        };
+
+        products[category].push(newProduct);
 
         // Save updated data
         await fs.writeFile(DATA_FILE, JSON.stringify(products, null, 2));
 
         res.json({ 
             success: true, 
-            product: { name, id: newId.toString(), description, category, imageUrl } 
+            product: newProduct
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to add product' });
+    }
+});
+
+// Update product
+app.put('/api/products', async (req, res) => {
+    try {
+        const { category, productId, name, description, price, imageUrl, password } = req.body;
+        
+        // Verify password
+        if (password !== '1234') {
+            return res.status(401).json({ error: 'Incorrect password' });
+        }
+
+        if (!category || !productId || !name) {
+            return res.status(400).json({ error: 'Category, product ID, and name are required' });
+        }
+
+        // Read current data
+        const data = await fs.readFile(DATA_FILE, 'utf8');
+        const products = JSON.parse(data);
+
+        // Find and update the product
+        const productIndex = products[category].findIndex(product => product.id === productId);
+        
+        if (productIndex === -1) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+
+        // Update product fields
+        const updatedProduct = {
+            ...products[category][productIndex],
+            name: name,
+            description: description || '',
+            price: price || null
+        };
+
+        // Update image only if new one provided
+        if (imageUrl) {
+            updatedProduct.imageUrl = imageUrl;
+        }
+
+        products[category][productIndex] = updatedProduct;
+
+        // Save updated data
+        await fs.writeFile(DATA_FILE, JSON.stringify(products, null, 2));
+
+        res.json({ 
+            success: true, 
+            product: updatedProduct
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update product' });
     }
 });
 
