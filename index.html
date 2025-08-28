@@ -134,10 +134,8 @@
             <h2>Other Electronics</h2>
             <div id="other-selection" class="selection-display"></div>
             <div class="search-container">
-                <input type="text" id="search-input" placeholder="Search for products (e.g., blender, toaster, etc.)" class="search-bar">
+                <input type="text" id="search-input" placeholder="Search for products by name or ID..." class="search-bar">
                 <div id="search-results" class="search-results"></div>
-                <input type="text" id="id-search-input" placeholder="Enter Product ID" class="search-bar">
-                <button id="id-search-btn" class="search-btn">Find by ID</button>
             </div>
             <div id="cart-section" class="cart-section">
                 <h3>Selected Items (<span id="cart-count">0</span>)</h3>
@@ -161,6 +159,7 @@
                     <form id="product-form">
                         <input type="text" id="product-name" placeholder="Product Name" required>
                         <textarea id="product-description" placeholder="Product Description" required></textarea>
+                        <input type="number" id="product-price" placeholder="Price (optional)" step="0.01" min="0">
                         <input type="file" id="product-image" accept="image/*" required>
                         <div id="image-preview" class="image-preview"></div>
                         <select id="product-category" required>
@@ -173,6 +172,31 @@
                             <option value="other">Other</option>
                         </select>
                         <button type="submit" class="admin-btn-action">Add Product</button>
+                    </form>
+                </div>
+                <div class="edit-product-section">
+                    <h3>Edit Product</h3>
+                    <select id="edit-category" required>
+                        <option value="">Select Category</option>
+                        <option value="fridges">Fridges</option>
+                        <option value="cloth-washers">Cloth Washers</option>
+                        <option value="acs">ACs</option>
+                        <option value="fans">Fans</option>
+                        <option value="dish-washers">Dish Washers</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <select id="edit-product" required>
+                        <option value="">Select Product</option>
+                    </select>
+                    <form id="edit-form" style="display: none;">
+                        <input type="text" id="edit-name" placeholder="Product Name" required>
+                        <textarea id="edit-description" placeholder="Product Description" required></textarea>
+                        <input type="number" id="edit-price" placeholder="Price (optional)" step="0.01" min="0">
+                        <input type="file" id="edit-image" accept="image/*">
+                        <div id="edit-image-preview" class="image-preview"></div>
+                        <p class="edit-note">Leave image field empty to keep current image</p>
+                        <button type="submit" class="admin-btn-action">Update Product</button>
+                        <button type="button" id="cancel-edit" class="admin-btn-action cancel-btn">Cancel</button>
                     </form>
                 </div>
                 <div class="remove-product-section">
