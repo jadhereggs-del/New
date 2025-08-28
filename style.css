@@ -672,6 +672,43 @@ body {
     min-height: 80px;
 }
 
+/* Product Price */
+.product-price {
+    background: linear-gradient(135deg, #4ecdc4, #44a08d);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    text-align: center;
+    margin-top: 10px;
+    box-shadow: 0 3px 10px rgba(76, 205, 196, 0.3);
+}
+
+/* Edit form styling */
+.edit-product-section {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 25px;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+
+.edit-note {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+    font-style: italic;
+    margin: 10px 0;
+}
+
+.cancel-btn {
+    background: #ff6b6b !important;
+    margin-left: 10px;
+}
+
+.cancel-btn:hover {
+    background: #ff5252 !important;
+}
+
 .admin-btn-action {
     background: linear-gradient(45deg, #e74c3c, #c0392b);
     color: white;
