@@ -146,7 +146,7 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Search functionality with fuzzy matching
+// Search functionality with fuzzy matching and ID search
 function setupSearch() {
     const searchInput = document.getElementById('search-input');
     const searchResults = document.getElementById('search-results');
@@ -177,10 +177,22 @@ function setupSearch() {
     });
 }
 
-// Fuzzy search algorithm
+// Enhanced search algorithm with ID support
 function findMatches(query) {
     const matches = [];
     
+    // Check for exact ID match first
+    allProducts.forEach(product => {
+        if (product.id.toLowerCase().includes(query)) {
+            matches.push({
+                product: product,
+                similarity: 1.0,
+                matchedKeyword: 'ID: ' + product.id
+            });
+        }
+    });
+    
+    // Then check name matches
     allProducts.forEach(product => {
         product.keywords.forEach(keyword => {
             const similarity = calculateSimilarity(query, keyword);
@@ -201,9 +213,9 @@ function findMatches(query) {
     matches
         .sort((a, b) => b.similarity - a.similarity)
         .forEach(match => {
-            if (!seenProducts.has(match.product.name)) {
+            if (!seenProducts.has(match.product.id)) {
                 uniqueMatches.push(match);
-                seenProducts.add(match.product.name);
+                seenProducts.add(match.product.id);
             }
         });
 
@@ -359,26 +371,33 @@ function redirectToWhatsApp() {
 // Admin panel functionality
 function setupAdminPanel() {
     const productForm = document.getElementById('product-form');
+    const editForm = document.getElementById('edit-form');
     const productImage = document.getElementById('product-image');
+    const editImage = document.getElementById('edit-image');
     const imagePreview = document.getElementById('image-preview');
+    const editImagePreview = document.getElementById('edit-image-preview');
     const removeBtn = document.getElementById('remove-btn');
     const removeCategorySelect = document.getElementById('remove-category');
+    const editCategorySelect = document.getElementById('edit-category');
+    const editProductSelect = document.getElementById('edit-product');
+    const cancelEditBtn = document.getElementById('cancel-edit');
     
     productForm.addEventListener('submit', function(e) {
         e.preventDefault();
         addNewProduct();
     });
     
+    editForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        updateProduct();
+    });
+    
     productImage.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                imagePreview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
-                imagePreview.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
-        }
+        previewImage(e, imagePreview);
+    });
+    
+    editImage.addEventListener('change', function(e) {
+        previewImage(e, editImagePreview);
     });
     
     removeBtn.addEventListener('click', function() {
@@ -388,6 +407,78 @@ function setupAdminPanel() {
     removeCategorySelect.addEventListener('change', function() {
         populateRemoveProductSelect(this.value);
     });
+    
+    editCategorySelect.addEventListener('change', function() {
+        populateEditProductSelect(this.value);
+    });
+    
+    editProductSelect.addEventListener('change', function() {
+        if (this.value) {
+            loadProductForEdit(editCategorySelect.value, this.value);
+        } else {
+            editForm.style.display = 'none';
+        }
+    });
+    
+    cancelEditBtn.addEventListener('click', function() {
+        cancelEdit();
+    });
+}
+
+function previewImage(event, previewContainer) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewContainer.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+            previewContainer.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function populateEditProductSelect(category) {
+    const editProductSelect = document.getElementById('edit-product');
+    editProductSelect.innerHTML = '<option value="">Select Product</option>';
+    document.getElementById('edit-form').style.display = 'none';
+    
+    if (!category || !productsData[category]) {
+        return;
+    }
+    
+    productsData[category].forEach(product => {
+        const option = document.createElement('option');
+        option.value = product.id;
+        option.textContent = product.name;
+        editProductSelect.appendChild(option);
+    });
+}
+
+function loadProductForEdit(category, productId) {
+    const product = productsData[category].find(p => p.id === productId);
+    if (!product) return;
+    
+    document.getElementById('edit-name').value = product.name;
+    document.getElementById('edit-description').value = product.description || '';
+    document.getElementById('edit-price').value = product.price || '';
+    
+    const editImagePreview = document.getElementById('edit-image-preview');
+    if (product.imageUrl) {
+        editImagePreview.innerHTML = `<img src="${product.imageUrl}" alt="Current">`;
+        editImagePreview.style.display = 'block';
+    } else {
+        editImagePreview.style.display = 'none';
+    }
+    
+    document.getElementById('edit-form').style.display = 'block';
+}
+
+function cancelEdit() {
+    document.getElementById('edit-category').value = '';
+    document.getElementById('edit-product').innerHTML = '<option value="">Select Product</option>';
+    document.getElementById('edit-form').style.display = 'none';
+    document.getElementById('edit-form').reset();
+    document.getElementById('edit-image-preview').style.display = 'none';
 }
 
 // Admin code prompt
@@ -404,6 +495,7 @@ function promptAdminCode() {
 async function addNewProduct() {
     const name = document.getElementById('product-name').value.trim();
     const description = document.getElementById('product-description').value.trim();
+    const price = document.getElementById('product-price').value.trim();
     const category = document.getElementById('product-category').value;
     const imageFile = document.getElementById('product-image').files[0];
     
@@ -439,6 +531,7 @@ async function addNewProduct() {
                 name,
                 description,
                 category,
+                price: price || null,
                 imageUrl: uploadResult.imageUrl,
                 password: '1234'
             })
@@ -484,6 +577,101 @@ async function addNewProduct() {
     }
 }
 
+// Update product (admin functionality)
+async function updateProduct() {
+    const category = document.getElementById('edit-category').value;
+    const productId = document.getElementById('edit-product').value;
+    const name = document.getElementById('edit-name').value.trim();
+    const description = document.getElementById('edit-description').value.trim();
+    const price = document.getElementById('edit-price').value.trim();
+    const imageFile = document.getElementById('edit-image').files[0];
+    
+    if (!name || !category || !productId) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+    
+    try {
+        let imageUrl = null;
+        
+        // Upload new image if provided
+        if (imageFile) {
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            
+            const uploadResponse = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const uploadResult = await uploadResponse.json();
+            
+            if (!uploadResponse.ok) {
+                alert(uploadResult.error || 'Failed to upload image');
+                return;
+            }
+            
+            imageUrl = uploadResult.imageUrl;
+        }
+        
+        // Update the product
+        const response = await fetch('/api/products', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                category,
+                productId,
+                name,
+                description,
+                price: price || null,
+                imageUrl,
+                password: '1234'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Update local data
+            const productIndex = productsData[category].findIndex(p => p.id === productId);
+            if (productIndex !== -1) {
+                productsData[category][productIndex] = result.product;
+            }
+            
+            // Update display
+            updateProductsDisplay();
+            
+            // Update search database if it's "other" category
+            if (category === 'other') {
+                const searchIndex = allProducts.findIndex(p => p.id === productId);
+                if (searchIndex !== -1) {
+                    allProducts[searchIndex] = {
+                        name: result.product.name,
+                        id: result.product.id,
+                        keywords: generateSearchKeywords(result.product.name)
+                    };
+                }
+            }
+            
+            // Clear form
+            cancelEdit();
+            
+            // Show success message
+            alert(`Product "${name}" updated successfully!`);
+            
+            // Go back to homepage
+            navigateToSection('homepage');
+        } else {
+            alert(result.error || 'Failed to update product');
+        }
+    } catch (error) {
+        alert('Failed to update product. Please check your connection and try again.');
+        console.error('Error:', error);
+    }
+}
+
 // Add product card to grid
 function addProductToGrid(product, category) {
     const section = document.getElementById(category);
@@ -503,10 +691,13 @@ function addProductToGrid(product, category) {
            <div class="product-image-placeholder" style="display: none;">${product.name} Image</div>`
         : `<div class="product-image-placeholder">${product.name} Image</div>`;
     
+    const priceHtml = product.price ? `<div class="product-price">$${parseFloat(product.price).toFixed(2)}</div>` : '';
+    
     productCard.innerHTML = `
         ${imageHtml}
         <h3>${product.name}</h3>
         ${product.description ? `<p>${product.description}</p>` : ''}
+        ${priceHtml}
     `;
     
     productsGrid.appendChild(productCard);
