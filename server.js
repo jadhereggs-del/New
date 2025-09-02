@@ -1,17 +1,17 @@
-
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
 const multer = require('multer');
-const { Client } = require('@replit/object-storage');
+const crypto = require('crypto');
 const app = express();
 const PORT = 5000;
 
-// Initialize Object Storage client
-const client = new Client();
-
-// Object Storage bucket name
-const BUCKET_NAME = 'store-images';
+// ImageKit configuration - Add your credentials here
+const IMAGEKIT_CONFIG = {
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY || 'public_2dRQAn3nHD2T8mMA+1PSq/dI7YY=',
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY || 'private_z9X2+3JBNLxXUPHT/dWWwpClkis=',
+    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || 'https://ik.imagekit.io/vcziplvso'
+};
 
 // Configure multer for memory storage
 const upload = multer({ 
@@ -76,18 +76,23 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
-// Serve images from Object Storage
+// Serve images by proxying ImageKit URLs
 app.get('/api/images/:filename', async (req, res) => {
     try {
         const filename = req.params.filename;
-        const imageBuffer = await client.downloadAsBytes(BUCKET_NAME, filename);
-        
-        // Set appropriate content type
-        const ext = path.extname(filename).toLowerCase();
-        const contentType = ext === '.png' ? 'image/png' : 
-                          ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
-                          ext === '.gif' ? 'image/gif' : 'image/jpeg';
-        
+        const imageUrl = `${IMAGEKIT_CONFIG.urlEndpoint}/${filename}`;
+
+        // Fetch image from ImageKit and proxy it
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(imageUrl);
+
+        if (!response.ok) {
+            return res.status(404).send('Image not found');
+        }
+
+        const imageBuffer = await response.buffer();
+        const contentType = response.headers.get('content-type') || 'image/jpeg';
+
         res.set('Content-Type', contentType);
         res.send(imageBuffer);
     } catch (error) {
@@ -106,16 +111,44 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
         // Generate unique filename
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const filename = uniqueSuffix + path.extname(req.file.originalname);
-        
-        // Upload to Object Storage
-        await client.uploadFromBytes(BUCKET_NAME, filename, req.file.buffer);
-        
-        const imageUrl = `/api/images/${filename}`;
-        
+
+        // Upload to ImageKit
+        const fetch = (await import('node-fetch')).default;
+        const FormData = (await import('form-data')).default;
+
+        const formData = new FormData();
+        formData.append('file', req.file.buffer, {
+            filename: filename,
+            contentType: req.file.mimetype
+        });
+        formData.append('fileName', filename);
+
+        // Create authentication signature
+        const authString = `${IMAGEKIT_CONFIG.privateKey}:`;
+        const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
+
+        const uploadResponse = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': authHeader,
+                ...formData.getHeaders()
+            },
+            body: formData
+        });
+
+        const uploadResult = await uploadResponse.json();
+
+        if (!uploadResponse.ok) {
+            console.error('ImageKit upload error:', uploadResult);
+            return res.status(500).json({ error: 'Failed to upload to ImageKit' });
+        }
+
+        const imageUrl = `/api/images/${uploadResult.name}`;
+
         res.json({ 
             success: true, 
             imageUrl: imageUrl,
-            filename: filename
+            filename: uploadResult.name
         });
     } catch (error) {
         console.error('Upload error:', error);
@@ -127,7 +160,7 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 app.post('/api/products', async (req, res) => {
     try {
         const { name, description, category, password, imageUrl, price } = req.body;
-        
+
         // Verify password
         if (password !== '1234') {
             return res.status(401).json({ error: 'Incorrect password' });
@@ -175,7 +208,7 @@ app.post('/api/products', async (req, res) => {
 app.put('/api/products', async (req, res) => {
     try {
         const { category, productId, name, description, price, imageUrl, password } = req.body;
-        
+
         // Verify password
         if (password !== '1234') {
             return res.status(401).json({ error: 'Incorrect password' });
@@ -191,7 +224,7 @@ app.put('/api/products', async (req, res) => {
 
         // Find and update the product
         const productIndex = products[category].findIndex(product => product.id === productId);
-        
+
         if (productIndex === -1) {
             return res.status(404).json({ error: 'Product not found' });
         }
@@ -227,7 +260,7 @@ app.put('/api/products', async (req, res) => {
 app.delete('/api/products', async (req, res) => {
     try {
         const { category, productId, password } = req.body;
-        
+
         // Verify password
         if (password !== '1234') {
             return res.status(401).json({ error: 'Incorrect password' });
@@ -248,7 +281,7 @@ app.delete('/api/products', async (req, res) => {
 
         // Find and remove the product
         const productIndex = products[category].findIndex(product => product.id === productId);
-        
+
         if (productIndex === -1) {
             return res.status(404).json({ error: 'Product not found' });
         }
@@ -274,6 +307,7 @@ async function startServer() {
     await initializeData();
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running on http://0.0.0.0:${PORT}`);
+        console.log('ImageKit endpoint:', IMAGEKIT_CONFIG.urlEndpoint);
     });
 }
 
