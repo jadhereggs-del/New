@@ -1,3 +1,4 @@
+
 {
   "fridges": [],
   "cloth-washers": [],
@@ -6,10 +7,25 @@
   "dish-washers": [],
   "other": [
     {
-      "name": "E",
+      "name": "Test",
       "id": "3113",
-      "description": "Ec",
-      "imageUrl": "/uploads/1755953742672-402138900.png"
+      "description": "Test",
+      "imageUrl": "/api/images/1755953742672-402138900.png",
+      "price": "100"
+    },
+    {
+      "name": "Hd",
+      "id": "2421",
+      "description": "Bd",
+      "imageUrl": "/api/images/1756806952459-774077105.jpeg",
+      "price": "20"
+    },
+    {
+      "name": "Hd",
+      "id": "1235",
+      "description": "Bd",
+      "imageUrl": "/api/images/1756806953246-936731525.jpeg",
+      "price": "20"
     }
   ]
 }
