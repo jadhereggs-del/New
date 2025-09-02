@@ -3,29 +3,19 @@ const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
 const multer = require('multer');
+const { Client } = require('@replit/object-storage');
 const app = express();
 const PORT = 5000;
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!require('fs').existsSync(uploadsDir)) {
-    require('fs').mkdirSync(uploadsDir, { recursive: true });
-}
+// Initialize Object Storage client
+const client = new Client();
 
-// Configure multer for local file storage
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/');
-    },
-    filename: function (req, file, cb) {
-        // Generate unique filename
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// Object Storage bucket name
+const BUCKET_NAME = 'store-images';
 
+// Configure multer for memory storage
 const upload = multer({ 
-    storage: storage,
+    storage: multer.memoryStorage(),
     fileFilter: function (req, file, cb) {
         // Accept only image files
         if (file.mimetype.startsWith('image/')) {
@@ -86,8 +76,25 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve images from Object Storage
+app.get('/api/images/:filename', async (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const imageBuffer = await client.downloadAsBytes(BUCKET_NAME, filename);
+        
+        // Set appropriate content type
+        const ext = path.extname(filename).toLowerCase();
+        const contentType = ext === '.png' ? 'image/png' : 
+                          ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
+                          ext === '.gif' ? 'image/gif' : 'image/jpeg';
+        
+        res.set('Content-Type', contentType);
+        res.send(imageBuffer);
+    } catch (error) {
+        console.error('Error serving image:', error);
+        res.status(404).send('Image not found');
+    }
+});
 
 // Upload image endpoint
 app.post('/api/upload', upload.single('image'), async (req, res) => {
@@ -96,13 +103,19 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
             return res.status(400).json({ error: 'No image file uploaded' });
         }
 
-        // File is already saved to uploads directory by multer
-        const imageUrl = `/uploads/${req.file.filename}`;
+        // Generate unique filename
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = uniqueSuffix + path.extname(req.file.originalname);
+        
+        // Upload to Object Storage
+        await client.uploadFromBytes(BUCKET_NAME, filename, req.file.buffer);
+        
+        const imageUrl = `/api/images/${filename}`;
         
         res.json({ 
             success: true, 
             imageUrl: imageUrl,
-            filename: req.file.filename
+            filename: filename
         });
     } catch (error) {
         console.error('Upload error:', error);
