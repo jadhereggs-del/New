@@ -36,33 +36,75 @@ app.use(express.static('.'));
 // Data file path
 const DATA_FILE = './products.json';
 
+// Sync products with ImageKit on startup
+async function syncWithImageKit() {
+    try {
+        const fetch = (await import('node-fetch')).default;
+        const authString = `${IMAGEKIT_CONFIG.privateKey}:`;
+        const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
+        
+        // Get all files from ImageKit
+        const response = await fetch('https://api.imagekit.io/v1/files', {
+            headers: {
+                'Authorization': authHeader
+            }
+        });
+        
+        if (!response.ok) {
+            console.warn('Failed to sync with ImageKit');
+            return;
+        }
+        
+        const imageKitFiles = await response.json();
+        console.log(`Found ${imageKitFiles.length} files in ImageKit`);
+        
+        // Read current products
+        const data = await fs.readFile(DATA_FILE, 'utf8');
+        const products = JSON.parse(data);
+        
+        // Update image URLs for existing products
+        Object.keys(products).forEach(category => {
+            products[category].forEach(product => {
+                if (product.imageUrl) {
+                    const filename = product.imageUrl.split('/').pop();
+                    const imageKitFile = imageKitFiles.find(file => file.name === filename);
+                    if (imageKitFile) {
+                        product.imageUrl = `/api/images/${filename}`;
+                    } else {
+                        // Image not found in ImageKit, remove imageUrl
+                        product.imageUrl = null;
+                    }
+                }
+            });
+        });
+        
+        // Save updated data
+        await fs.writeFile(DATA_FILE, JSON.stringify(products, null, 2));
+        console.log('Synced products with ImageKit successfully');
+        
+    } catch (error) {
+        console.warn('Error syncing with ImageKit:', error);
+    }
+}
+
 // Initialize products data file if it doesn't exist
 async function initializeData() {
     try {
         await fs.access(DATA_FILE);
+        // File exists, sync with ImageKit
+        await syncWithImageKit();
     } catch (error) {
-        // File doesn't exist, create it with default data
+        // File doesn't exist, create it with clean default data
         const defaultData = {
-            fridges: [
-                { name: 'Premium Refrigerator', id: '1001' }
-            ],
-            'cloth-washers': [
-                { name: 'Front Load Washer', id: '2001' }
-            ],
-            acs: [
-                { name: 'Split AC Unit', id: '3001' }
-            ],
-            fans: [
-                { name: 'Ceiling Fan', id: '4001' }
-            ],
-            'dish-washers': [
-                { name: 'Built-in Dishwasher', id: '5001' }
-            ],
-            other: [
-                { name: 'High-Speed Blender', id: '4152' }
-            ]
+            fridges: [],
+            'cloth-washers': [],
+            acs: [],
+            fans: [],
+            'dish-washers': [],
+            other: []
         };
         await fs.writeFile(DATA_FILE, JSON.stringify(defaultData, null, 2));
+        console.log('Created clean products data file');
     }
 }
 
@@ -287,6 +329,31 @@ app.delete('/api/products', async (req, res) => {
         }
 
         const removedProduct = products[category][productIndex];
+        
+        // Delete image from ImageKit if it exists
+        if (removedProduct.imageUrl) {
+            try {
+                const filename = removedProduct.imageUrl.split('/').pop();
+                const fetch = (await import('node-fetch')).default;
+                
+                const authString = `${IMAGEKIT_CONFIG.privateKey}:`;
+                const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
+                
+                const deleteResponse = await fetch(`https://api.imagekit.io/v1/files/${filename}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': authHeader
+                    }
+                });
+                
+                if (!deleteResponse.ok) {
+                    console.warn('Failed to delete image from ImageKit:', filename);
+                }
+            } catch (imageError) {
+                console.warn('Error deleting image from ImageKit:', imageError);
+            }
+        }
+
         products[category].splice(productIndex, 1);
 
         // Save updated data
@@ -298,7 +365,40 @@ app.delete('/api/products', async (req, res) => {
             category: category
         });
     } catch (error) {
+        console.error('Remove product error:', error);
         res.status(500).json({ error: 'Failed to remove product' });
+    }
+});
+
+// Get ImageKit files (admin only)
+app.get('/api/imagekit/files', async (req, res) => {
+    try {
+        const { password } = req.query;
+        
+        if (password !== '1234') {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        const fetch = (await import('node-fetch')).default;
+        const authString = `${IMAGEKIT_CONFIG.privateKey}:`;
+        const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
+        
+        const response = await fetch('https://api.imagekit.io/v1/files', {
+            headers: {
+                'Authorization': authHeader
+            }
+        });
+        
+        if (!response.ok) {
+            return res.status(500).json({ error: 'Failed to fetch ImageKit files' });
+        }
+        
+        const files = await response.json();
+        res.json(files);
+        
+    } catch (error) {
+        console.error('Error fetching ImageKit files:', error);
+        res.status(500).json({ error: 'Failed to fetch files' });
     }
 });
 
