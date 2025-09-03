@@ -1118,6 +1118,13 @@ function setupRunAllImages() {
                 });
                 
                 syncResults.innerHTML = resultsHTML;
+                
+                // Reload products to show newly created ones with proper selection functionality
+                setTimeout(() => {
+                    loadProducts().then(() => {
+                        console.log('Products refreshed after auto-creation');
+                    });
+                }, 1000); // Small delay to ensure server has saved the data
             } else {
                 syncResults.innerHTML = `<div class="error">Error: ${data.error}</div>`;
             }
