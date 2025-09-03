@@ -759,6 +759,67 @@ body {
     background: linear-gradient(45deg, #c0392b, #a93226) !important;
 }
 
+.sync-btn {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%) !important;
+}
+
+.sync-btn:hover {
+    background: linear-gradient(135deg, #2980b9 0%, #1e6091 100%) !important;
+}
+
+.sync-images-section {
+    margin-top: 30px;
+    padding: 20px;
+    background: rgba(52, 152, 219, 0.1);
+    border-radius: 10px;
+    border: 1px solid rgba(52, 152, 219, 0.3);
+}
+
+.sync-images-section h3 {
+    color: #3498db;
+    margin-bottom: 10px;
+}
+
+.sync-images-section p {
+    color: #666;
+    margin-bottom: 15px;
+    font-size: 0.9rem;
+}
+
+.sync-results {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #333;
+    display: none;
+}
+
+.sync-results.show {
+    display: block;
+}
+
+.sync-results .success {
+    color: #27ae60;
+}
+
+.sync-results .warning {
+    color: #f39c12;
+}
+
+.sync-results .error {
+    color: #e74c3c;
+}
+
+.sync-results .info {
+    color: #3498db;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .animated-title {
