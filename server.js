@@ -152,10 +152,25 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ error: 'No image file uploaded' });
         }
+        
+        // Get category from form data
+        const category = req.body.category || 'other';
+        
+        // Map category names to filename-friendly versions
+        const categoryMap = {
+            'fridges': 'fridge',
+            'cloth-washers': 'clothwash',
+            'acs': 'ac',
+            'fans': 'fan',
+            'dish-washers': 'dishwash',
+            'other': 'other'
+        };
+        
+        const categoryPrefix = categoryMap[category] || 'other';
 
-        // Generate unique filename
+        // Generate unique filename with category
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const filename = uniqueSuffix + path.extname(req.file.originalname);
+        const filename = `${categoryPrefix}_${uniqueSuffix}${path.extname(req.file.originalname)}`;
 
         console.log('Uploading to the web');
         console.log('Uploading to Imagekit');
@@ -429,6 +444,102 @@ app.get('/api/imagekit/files', async (req, res) => {
     } catch (error) {
         console.error('Error fetching ImageKit files:', error);
         res.status(500).json({ error: 'Failed to fetch files' });
+    }
+});
+
+// Run all images - sync ImageKit files with products
+app.post('/api/run-all-images', async (req, res) => {
+    try {
+        const { password } = req.body;
+        
+        if (password !== '1234') {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        const fetch = (await import('node-fetch')).default;
+        const authString = `${IMAGEKIT_CONFIG.privateKey}:`;
+        const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
+        
+        // Get all files from ImageKit
+        const response = await fetch('https://api.imagekit.io/v1/files', {
+            headers: {
+                'Authorization': authHeader
+            }
+        });
+        
+        if (!response.ok) {
+            return res.status(500).json({ error: 'Failed to fetch ImageKit files' });
+        }
+        
+        const imageKitFiles = await response.json();
+        
+        // Read current products
+        const data = await fs.readFile(DATA_FILE, 'utf8');
+        const products = JSON.parse(data);
+        
+        const results = [];
+        let updatedCount = 0;
+        
+        // Check each ImageKit file
+        imageKitFiles.forEach(file => {
+            const filename = file.name;
+            let foundMatch = false;
+            
+            // Search through all categories for a product using this image
+            Object.keys(products).forEach(category => {
+                products[category].forEach(product => {
+                    if (product.imageUrl && product.imageUrl.includes(filename)) {
+                        foundMatch = true;
+                        results.push({
+                            type: 'success',
+                            message: `${filename} is assigned to "${product.name}" in ${category}`
+                        });
+                    }
+                });
+            });
+            
+            if (!foundMatch) {
+                // Try to detect category from filename
+                const lowerFilename = filename.toLowerCase();
+                let suggestedCategory = null;
+                
+                if (lowerFilename.includes('fridge') || lowerFilename.includes('refrigerator')) {
+                    suggestedCategory = 'fridges';
+                } else if (lowerFilename.includes('wash') || lowerFilename.includes('laundry') || lowerFilename.includes('cloth')) {
+                    suggestedCategory = 'cloth-washers';
+                } else if (lowerFilename.includes('ac') || lowerFilename.includes('air') || lowerFilename.includes('conditioner') || lowerFilename.includes('cooling')) {
+                    suggestedCategory = 'acs';
+                } else if (lowerFilename.includes('fan') || lowerFilename.includes('ventilat')) {
+                    suggestedCategory = 'fans';
+                } else if (lowerFilename.includes('dish') || lowerFilename.includes('dishwash')) {
+                    suggestedCategory = 'dish-washers';
+                }
+                
+                if (suggestedCategory) {
+                    results.push({
+                        type: 'info',
+                        message: `${filename} doesn't have a place - suggested category: ${suggestedCategory}`
+                    });
+                } else {
+                    results.push({
+                        type: 'warning',
+                        message: `${filename} doesn't have a place - suggested category: other`
+                    });
+                }
+            }
+        });
+        
+        res.json({ 
+            success: true,
+            results: results,
+            totalFiles: imageKitFiles.length,
+            assignedFiles: results.filter(r => r.type === 'success').length,
+            unassignedFiles: results.filter(r => r.type === 'warning').length
+        });
+        
+    } catch (error) {
+        console.error('Error running all images:', error);
+        res.status(500).json({ error: 'Failed to run image sync' });
     }
 });
 
