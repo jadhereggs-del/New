@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupSearch();
     setupIdSearch();
     setupHomepageIdSearch();
+    setupRunAllImages();
     setupCartFunctionality();
     setupAdminPanel();
 });
@@ -538,6 +539,7 @@ async function addNewProduct() {
         // First upload the image
         const formData = new FormData();
         formData.append('image', imageFile);
+        formData.append('category', category); // Include category in upload
         
         const uploadResponse = await fetch('/api/upload', {
             method: 'POST',
@@ -1069,4 +1071,59 @@ function addLoadingState(element, duration = 1000) {
         element.textContent = originalText;
         element.disabled = false;
     }, duration);
+}
+
+// Setup Run All Images functionality
+function setupRunAllImages() {
+    const runAllImagesBtn = document.getElementById('run-all-images-btn');
+    const syncResults = document.getElementById('sync-results');
+    
+    if (!runAllImagesBtn || !syncResults) return;
+    
+    runAllImagesBtn.addEventListener('click', async function() {
+        const password = prompt('Enter admin password:');
+        if (!password) return;
+        
+        // Show loading state
+        const originalText = this.textContent;
+        this.textContent = 'Running...';
+        this.disabled = true;
+        
+        syncResults.innerHTML = 'Fetching images from ImageKit...';
+        syncResults.classList.add('show');
+        
+        try {
+            const response = await fetch('/api/run-all-images', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ password })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                let resultsHTML = `<div class="success">✓ Scan completed!</div>`;
+                resultsHTML += `<div class="success">Total files in ImageKit: ${data.totalFiles}</div>`;
+                resultsHTML += `<div class="success">Assigned files: ${data.assignedFiles}</div>`;
+                resultsHTML += `<div class="warning">Unassigned files: ${data.unassignedFiles}</div><br>`;
+                
+                data.results.forEach(result => {
+                    const className = result.type;
+                    resultsHTML += `<div class="${className}">${result.message}</div>`;
+                });
+                
+                syncResults.innerHTML = resultsHTML;
+            } else {
+                syncResults.innerHTML = `<div class="error">Error: ${data.error}</div>`;
+            }
+        } catch (error) {
+            syncResults.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+        } finally {
+            // Restore button state
+            this.textContent = originalText;
+            this.disabled = false;
+        }
+    });
 }
