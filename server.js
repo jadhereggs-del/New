@@ -171,10 +171,10 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
         
         const categoryPrefix = categoryMap[category] || 'other';
         
-        // Clean strings for filename (remove special characters)
-        const cleanName = productName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+        // Clean strings for filename (use dashes for spaces, remove other special characters)
+        const cleanName = productName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '').substring(0, 20);
         const cleanPrice = price.replace(/[^0-9.]/g, '');
-        const cleanDesc = description.replace(/[^a-zA-Z0-9]/g, '').substring(0, 30);
+        const cleanDesc = description.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '').substring(0, 30);
 
         // Generate filename with all details: category_name_price_description_timestamp.ext
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -517,9 +517,9 @@ app.post('/api/run-all-images', async (req, res) => {
                 // Parse filename format: category_name_price_description_timestamp.ext
                 if (parts.length >= 4) {
                     const categoryPrefix = parts[0].toLowerCase();
-                    productName = parts[1] || 'Unknown Product';
+                    productName = (parts[1] || 'Unknown Product').replace(/-/g, ' ');
                     price = parts[2] && !isNaN(parts[2]) ? parseFloat(parts[2]) : null;
-                    description = parts[3] || 'Auto-generated from ImageKit';
+                    description = (parts[3] || 'Auto-generated from ImageKit').replace(/-/g, ' ');
                     
                     // Map category prefixes back to full category names
                     const categoryReverseMap = {
@@ -563,7 +563,8 @@ app.post('/api/run-all-images', async (req, res) => {
                         id: newId.toString(),
                         description: description,
                         imageUrl: imageUrl,
-                        price: price
+                        price: price,
+                        selected: false // Add selection functionality
                     };
                     
                     // Ensure category exists
@@ -591,6 +592,7 @@ app.post('/api/run-all-images', async (req, res) => {
         // Save updated products if any were created
         if (updatedCount > 0) {
             await fs.writeFile(DATA_FILE, JSON.stringify(products, null, 2));
+            console.log(`Successfully created ${updatedCount} new products`);
         }
         
         res.json({ 
