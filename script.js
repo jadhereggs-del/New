@@ -146,43 +146,61 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Search functionality with fuzzy matching and ID search
+// Search functionality with fuzzy matching and ID search - now works for all categories
 function setupSearch() {
-    const searchInput = document.getElementById('search-input');
-    const searchResults = document.getElementById('search-results');
-
-    searchInput.addEventListener('input', function() {
-        const query = this.value.toLowerCase().trim();
+    // Setup search for all categories
+    const categories = ['other', 'fridges', 'cloth-washers', 'acs', 'fans', 'dish-washers', 'homepage'];
+    
+    categories.forEach(category => {
+        const searchInputId = category === 'homepage' ? 'homepage-search-input' : `${category}-search-input`;
+        const searchResultsId = category === 'homepage' ? 'homepage-search-results' : `${category}-search-results`;
         
-        if (query.length < 2) {
-            searchResults.style.display = 'none';
-            return;
-        }
+        const searchInput = document.getElementById(searchInputId);
+        const searchResults = document.getElementById(searchResultsId);
+        
+        if (!searchInput || !searchResults) return;
+        
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            
+            if (query.length < 2) {
+                searchResults.style.display = 'none';
+                return;
+            }
 
-        const matches = findMatches(query);
-        displaySearchResults(matches, searchResults);
-    });
+            // For homepage, search all products. For others, filter by category
+            const categoryFilter = category === 'homepage' || category === 'other' ? null : category;
+            const matches = findMatches(query, categoryFilter);
+            displaySearchResults(matches, searchResults, searchInputId);
+        });
 
-    searchInput.addEventListener('focus', function() {
-        if (this.value.length >= 2) {
-            searchResults.style.display = 'block';
-        }
-    });
+        searchInput.addEventListener('focus', function() {
+            if (this.value.length >= 2) {
+                searchResults.style.display = 'block';
+            }
+        });
 
-    // Hide search results when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.style.display = 'none';
-        }
+        // Hide search results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.style.display = 'none';
+            }
+        });
     });
 }
 
-// Enhanced search algorithm with ID support
-function findMatches(query) {
+// Enhanced search algorithm with ID support - now works for specific categories
+function findMatches(query, categoryFilter = null) {
     const matches = [];
     
+    let searchProducts = allProducts;
+    // Filter by category if specified
+    if (categoryFilter) {
+        searchProducts = allProducts.filter(product => product.category === categoryFilter);
+    }
+    
     // Check for exact ID match first
-    allProducts.forEach(product => {
+    searchProducts.forEach(product => {
         if (product.id.toLowerCase().includes(query)) {
             matches.push({
                 product: product,
@@ -193,7 +211,7 @@ function findMatches(query) {
     });
     
     // Then check name matches
-    allProducts.forEach(product => {
+    searchProducts.forEach(product => {
         product.keywords.forEach(keyword => {
             const similarity = calculateSimilarity(query, keyword);
             if (similarity > 0.6) { // 60% similarity threshold
@@ -261,8 +279,8 @@ function levenshteinDistance(str1, str2) {
     return matrix[str2.length][str1.length];
 }
 
-// Display search results
-function displaySearchResults(matches, resultsContainer) {
+// Display search results - now works for any search input and results container
+function displaySearchResults(matches, resultsContainer, searchInputId = 'search-input') {
     resultsContainer.innerHTML = '';
     
     if (matches.length === 0) {
@@ -271,11 +289,17 @@ function displaySearchResults(matches, resultsContainer) {
         matches.slice(0, 5).forEach(match => { // Show top 5 matches
             const resultItem = document.createElement('div');
             resultItem.className = 'search-result-item';
-            resultItem.textContent = match.product.name;
+            resultItem.innerHTML = `
+                <strong>${match.product.name}</strong><br>
+                <small>ID: ${match.product.id} | Match: ${match.matchedKeyword}</small>
+            `;
             resultItem.addEventListener('click', function() {
                 selectProductByName(match.product.name);
                 resultsContainer.style.display = 'none';
-                document.getElementById('search-input').value = match.product.name;
+                const searchInput = document.getElementById(searchInputId);
+                if (searchInput) {
+                    searchInput.value = match.product.name;
+                }
             });
             resultsContainer.appendChild(resultItem);
         });
@@ -348,21 +372,27 @@ function resetProductSelection() {
 
 // Redirect to WhatsApp
 function redirectToWhatsApp() {
-    const currentSection = document.querySelector('.section.active');
-    const sectionId = currentSection.id;
-    const products = selectedProducts[sectionId] || [];
+    // Collect products from ALL tabs, not just current one
+    let allSelectedProducts = [];
     
-    if (products.length === 0) return;
+    // Go through all categories and collect selected products
+    Object.keys(selectedProducts).forEach(categoryId => {
+        if (selectedProducts[categoryId] && selectedProducts[categoryId].length > 0) {
+            allSelectedProducts = allSelectedProducts.concat(selectedProducts[categoryId]);
+        }
+    });
+    
+    if (allSelectedProducts.length === 0) return;
     
     let message = `Hello! I'm interested in purchasing the following items from your electronics store:\n\n`;
     
-    products.forEach((product, index) => {
+    allSelectedProducts.forEach((product, index) => {
         message += `${index + 1}. ${product.name} (Product ID: ${product.id})\n`;
     });
     
     message += `\nPlease let me know about availability and pricing. Thank you!`;
     
-    const phoneNumber = '+96171294697';
+    const phoneNumber = '+9613095233';
     const whatsappUrl = `https://wa.me/${phoneNumber.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
     
     window.open(whatsappUrl, '_blank');
