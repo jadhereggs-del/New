@@ -540,6 +540,9 @@ async function addNewProduct() {
         const formData = new FormData();
         formData.append('image', imageFile);
         formData.append('category', category); // Include category in upload
+        formData.append('productName', name); // Include product name
+        formData.append('price', price || '0'); // Include price
+        formData.append('description', description || 'No description'); // Include description
         
         const uploadResponse = await fetch('/api/upload', {
             method: 'POST',
