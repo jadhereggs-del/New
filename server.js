@@ -122,6 +122,8 @@ app.get('/api/products', async (req, res) => {
 app.get('/api/images/:filename', async (req, res) => {
     try {
         const filename = req.params.filename;
+        console.log('Getting images');
+        console.log('Uploading them to their Place');
         const imageUrl = `${IMAGEKIT_CONFIG.urlEndpoint}/${filename}`;
 
         // Fetch image from ImageKit and proxy it
@@ -134,7 +136,8 @@ app.get('/api/images/:filename', async (req, res) => {
 
         const imageBuffer = await response.buffer();
         const contentType = response.headers.get('content-type') || 'image/jpeg';
-
+        
+        console.log('Finishes');
         res.set('Content-Type', contentType);
         res.send(imageBuffer);
     } catch (error) {
@@ -154,6 +157,9 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const filename = uniqueSuffix + path.extname(req.file.originalname);
 
+        console.log('Uploading to the web');
+        console.log('Uploading to Imagekit');
+        
         // Upload to ImageKit
         const fetch = (await import('node-fetch')).default;
         const FormData = (await import('form-data')).default;
@@ -185,6 +191,8 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
             return res.status(500).json({ error: 'Failed to upload to ImageKit' });
         }
 
+        console.log('Uploaded successfully');
+        
         const imageUrl = `/api/images/${uploadResult.name}`;
 
         res.json({ 
@@ -333,21 +341,43 @@ app.delete('/api/products', async (req, res) => {
         // Delete image from ImageKit if it exists
         if (removedProduct.imageUrl) {
             try {
+                console.log('Deleting image');
                 const filename = removedProduct.imageUrl.split('/').pop();
                 const fetch = (await import('node-fetch')).default;
                 
                 const authString = `${IMAGEKIT_CONFIG.privateKey}:`;
                 const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
                 
-                const deleteResponse = await fetch(`https://api.imagekit.io/v1/files/${filename}`, {
-                    method: 'DELETE',
+                // First get file ID from filename
+                const listResponse = await fetch('https://api.imagekit.io/v1/files?name=' + encodeURIComponent(filename), {
                     headers: {
                         'Authorization': authHeader
                     }
                 });
                 
-                if (!deleteResponse.ok) {
-                    console.warn('Failed to delete image from ImageKit:', filename);
+                if (listResponse.ok) {
+                    const files = await listResponse.json();
+                    if (files.length > 0) {
+                        const fileId = files[0].fileId;
+                        
+                        // Now delete using the correct file ID
+                        const deleteResponse = await fetch(`https://api.imagekit.io/v1/files/${fileId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': authHeader
+                            }
+                        });
+                        
+                        if (!deleteResponse.ok) {
+                            console.warn('Failed to delete image from ImageKit:', filename);
+                        } else {
+                            console.log('Deleted');
+                        }
+                    } else {
+                        console.warn('File not found in ImageKit:', filename);
+                    }
+                } else {
+                    console.warn('Failed to get file info from ImageKit:', filename);
                 }
             } catch (imageError) {
                 console.warn('Error deleting image from ImageKit:', imageError);
