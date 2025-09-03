@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupHomepageIdSearch();
     setupRunAllImages();
     setupCartFunctionality();
+    setupGlobalCartTracker();
     setupAdminPanel();
 });
 
@@ -717,9 +718,7 @@ function addProductToGrid(product, category) {
     productCard.setAttribute('data-product', product.name);
     productCard.setAttribute('data-id', product.id);
     
-    productCard.addEventListener('click', function() {
-        selectProduct(this);
-    });
+    // Don't add event listener here - it will be added by updateProductEventListeners
     
     const imageHtml = product.imageUrl 
         ? `<img src="${product.imageUrl}" alt="${product.name}" class="product-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
@@ -742,7 +741,12 @@ function addProductToGrid(product, category) {
 function updateProductEventListeners() {
     const selectableProducts = document.querySelectorAll('.selectable');
     selectableProducts.forEach(product => {
-        product.addEventListener('click', function() {
+        // Remove any existing click listeners by cloning the element
+        const newProduct = product.cloneNode(true);
+        product.parentNode.replaceChild(newProduct, product);
+        
+        // Add fresh click listener
+        newProduct.addEventListener('click', function() {
             selectProduct(this);
         });
     });
@@ -995,6 +999,9 @@ function updateCartDisplay(sectionId) {
     const clearBtn = document.getElementById(sectionId === 'other' ? 'clear-cart' : `${sectionId}-clear-cart`);
     const finishBtn = document.getElementById(sectionId === 'other' ? 'finish-btn' : `${sectionId}-finish-btn`);
     
+    console.log('updateCartDisplay called for:', sectionId, 'products:', products.length);
+    console.log('finishBtn found:', !!finishBtn);
+    
     // Update count
     cartCount.textContent = products.length;
     
@@ -1018,13 +1025,20 @@ function updateCartDisplay(sectionId) {
     
     // Show/hide buttons
     if (products.length > 0) {
-        clearBtn.style.display = 'block';
-        finishBtn.style.display = 'block';
-        finishBtn.style.animation = 'fadeIn 0.5s ease';
+        if (clearBtn) clearBtn.style.display = 'block';
+        if (finishBtn) {
+            finishBtn.style.display = 'block';
+            finishBtn.style.animation = 'fadeIn 0.5s ease';
+        } else {
+            console.error('Finish button not found for section:', sectionId);
+        }
     } else {
-        clearBtn.style.display = 'none';
-        finishBtn.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (finishBtn) finishBtn.style.display = 'none';
     }
+    
+    // Update global cart tracker
+    updateGlobalCartTracker();
 }
 
 // Remove item from cart
@@ -1136,4 +1150,111 @@ function setupRunAllImages() {
             this.disabled = false;
         }
     });
+}
+
+// Global Cart Tracker Functions
+function updateGlobalCartTracker() {
+    const globalCartTracker = document.getElementById('global-cart-tracker');
+    const globalCartCount = document.getElementById('global-cart-count');
+    
+    // Calculate total items across all categories
+    let totalItems = 0;
+    Object.keys(selectedProducts).forEach(category => {
+        totalItems += (selectedProducts[category] || []).length;
+    });
+    
+    // Show/hide global cart tracker
+    if (totalItems > 0) {
+        globalCartTracker.style.display = 'block';
+        globalCartCount.textContent = totalItems;
+        document.body.classList.add('global-cart-visible');
+    } else {
+        globalCartTracker.style.display = 'none';
+        document.body.classList.remove('global-cart-visible');
+        hideGlobalCartItems(); // Hide cart items if showing
+    }
+}
+
+function setupGlobalCartTracker() {
+    const globalViewBtn = document.getElementById('global-view-cart');
+    const globalFinishBtn = document.getElementById('global-finish-btn');
+    const globalClearBtn = document.getElementById('global-clear-cart');
+    const globalCartItems = document.getElementById('global-cart-items');
+    
+    // View/Hide cart items
+    globalViewBtn.addEventListener('click', function() {
+        if (globalCartItems.style.display === 'none' || !globalCartItems.style.display) {
+            showGlobalCartItems();
+            this.textContent = 'Hide Cart';
+        } else {
+            hideGlobalCartItems();
+            this.textContent = 'View Cart';
+        }
+    });
+    
+    // Global finish button
+    globalFinishBtn.addEventListener('click', function() {
+        redirectToWhatsApp();
+    });
+    
+    // Global clear all button
+    globalClearBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear all selected items?')) {
+            clearAllCarts();
+        }
+    });
+}
+
+function showGlobalCartItems() {
+    const globalCartItems = document.getElementById('global-cart-items');
+    const globalViewBtn = document.getElementById('global-view-cart');
+    
+    // Build cart items HTML
+    globalCartItems.innerHTML = '';
+    
+    Object.keys(selectedProducts).forEach(category => {
+        const products = selectedProducts[category] || [];
+        products.forEach(product => {
+            const cartItem = document.createElement('div');
+            cartItem.className = 'global-cart-item';
+            cartItem.innerHTML = `
+                <div class="global-cart-item-info">
+                    <div class="global-cart-item-name">${product.name} (ID: ${product.id})</div>
+                    <div class="global-cart-item-category">${category.replace('-', ' ')}</div>
+                </div>
+                <button class="global-cart-item-remove" data-category="${category}" data-id="${product.id}">×</button>
+            `;
+            
+            // Add remove functionality
+            cartItem.querySelector('.global-cart-item-remove').addEventListener('click', function() {
+                const categoryId = this.getAttribute('data-category');
+                const productId = this.getAttribute('data-id');
+                removeFromCart(categoryId, productId);
+            });
+            
+            globalCartItems.appendChild(cartItem);
+        });
+    });
+    
+    globalCartItems.style.display = 'block';
+    globalViewBtn.textContent = 'Hide Cart';
+}
+
+function hideGlobalCartItems() {
+    const globalCartItems = document.getElementById('global-cart-items');
+    const globalViewBtn = document.getElementById('global-view-cart');
+    
+    globalCartItems.style.display = 'none';
+    globalViewBtn.textContent = 'View Cart';
+}
+
+function clearAllCarts() {
+    // Clear all categories
+    Object.keys(selectedProducts).forEach(category => {
+        clearCart(category);
+    });
+    
+    // Update global tracker
+    updateGlobalCartTracker();
+    hideGlobalCartItems();
 }
