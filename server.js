@@ -153,8 +153,11 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
             return res.status(400).json({ error: 'No image file uploaded' });
         }
         
-        // Get category from form data
+        // Get product details from form data
         const category = req.body.category || 'other';
+        const productName = req.body.productName || 'Unknown';
+        const price = req.body.price || '0';
+        const description = req.body.description || 'No description';
         
         // Map category names to filename-friendly versions
         const categoryMap = {
@@ -167,10 +170,15 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
         };
         
         const categoryPrefix = categoryMap[category] || 'other';
+        
+        // Clean strings for filename (remove special characters)
+        const cleanName = productName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+        const cleanPrice = price.replace(/[^0-9.]/g, '');
+        const cleanDesc = description.replace(/[^a-zA-Z0-9]/g, '').substring(0, 30);
 
-        // Generate unique filename with category
+        // Generate filename with all details: category_name_price_description_timestamp.ext
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const filename = `${categoryPrefix}_${uniqueSuffix}${path.extname(req.file.originalname)}`;
+        const filename = `${categoryPrefix}_${cleanName}_${cleanPrice}_${cleanDesc}_${uniqueSuffix}${path.extname(req.file.originalname)}`;
 
         console.log('Uploading to the web');
         console.log('Uploading to Imagekit');
@@ -480,8 +488,8 @@ app.post('/api/run-all-images', async (req, res) => {
         const results = [];
         let updatedCount = 0;
         
-        // Check each ImageKit file
-        imageKitFiles.forEach(file => {
+        // Check each ImageKit file and auto-create products
+        for (const file of imageKitFiles) {
             const filename = file.name;
             let foundMatch = false;
             
@@ -492,42 +500,98 @@ app.post('/api/run-all-images', async (req, res) => {
                         foundMatch = true;
                         results.push({
                             type: 'success',
-                            message: `${filename} is assigned to "${product.name}" in ${category}`
+                            message: `${filename} is already assigned to "${product.name}" in ${category}`
                         });
                     }
                 });
             });
             
             if (!foundMatch) {
-                // Try to detect category from filename
-                const lowerFilename = filename.toLowerCase();
-                let suggestedCategory = null;
+                // Try to parse filename to extract product details
+                const parts = filename.split('_');
+                let detectedCategory = null;
+                let productName = 'Unknown Product';
+                let price = null;
+                let description = 'Auto-generated from ImageKit';
                 
-                if (lowerFilename.includes('fridge') || lowerFilename.includes('refrigerator')) {
-                    suggestedCategory = 'fridges';
-                } else if (lowerFilename.includes('wash') || lowerFilename.includes('laundry') || lowerFilename.includes('cloth')) {
-                    suggestedCategory = 'cloth-washers';
-                } else if (lowerFilename.includes('ac') || lowerFilename.includes('air') || lowerFilename.includes('conditioner') || lowerFilename.includes('cooling')) {
-                    suggestedCategory = 'acs';
-                } else if (lowerFilename.includes('fan') || lowerFilename.includes('ventilat')) {
-                    suggestedCategory = 'fans';
-                } else if (lowerFilename.includes('dish') || lowerFilename.includes('dishwash')) {
-                    suggestedCategory = 'dish-washers';
+                // Parse filename format: category_name_price_description_timestamp.ext
+                if (parts.length >= 4) {
+                    const categoryPrefix = parts[0].toLowerCase();
+                    productName = parts[1] || 'Unknown Product';
+                    price = parts[2] && !isNaN(parts[2]) ? parseFloat(parts[2]) : null;
+                    description = parts[3] || 'Auto-generated from ImageKit';
+                    
+                    // Map category prefixes back to full category names
+                    const categoryReverseMap = {
+                        'fridge': 'fridges',
+                        'clothwash': 'cloth-washers',
+                        'ac': 'acs',
+                        'fan': 'fans',
+                        'dishwash': 'dish-washers',
+                        'other': 'other'
+                    };
+                    
+                    detectedCategory = categoryReverseMap[categoryPrefix];
+                } else {
+                    // Fallback to keyword detection for old files
+                    const lowerFilename = filename.toLowerCase();
+                    if (lowerFilename.includes('fridge') || lowerFilename.includes('refrigerator')) {
+                        detectedCategory = 'fridges';
+                    } else if (lowerFilename.includes('wash') || lowerFilename.includes('laundry') || lowerFilename.includes('cloth')) {
+                        detectedCategory = 'cloth-washers';
+                    } else if (lowerFilename.includes('ac') || lowerFilename.includes('air') || lowerFilename.includes('conditioner') || lowerFilename.includes('cooling')) {
+                        detectedCategory = 'acs';
+                    } else if (lowerFilename.includes('fan') || lowerFilename.includes('ventilat')) {
+                        detectedCategory = 'fans';
+                    } else if (lowerFilename.includes('dish') || lowerFilename.includes('dishwash')) {
+                        detectedCategory = 'dish-washers';
+                    } else {
+                        detectedCategory = 'other';
+                    }
+                    
+                    // Extract name from filename if no structured format
+                    productName = filename.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
                 }
                 
-                if (suggestedCategory) {
+                // Create the product automatically
+                if (detectedCategory) {
+                    const newId = Math.floor(Math.random() * 9000) + 1000;
+                    const imageUrl = `/api/images/${filename}`;
+                    
+                    const newProduct = {
+                        name: productName,
+                        id: newId.toString(),
+                        description: description,
+                        imageUrl: imageUrl,
+                        price: price
+                    };
+                    
+                    // Ensure category exists
+                    if (!products[detectedCategory]) {
+                        products[detectedCategory] = [];
+                    }
+                    
+                    // Add product to the category
+                    products[detectedCategory].push(newProduct);
+                    updatedCount++;
+                    
                     results.push({
-                        type: 'info',
-                        message: `${filename} doesn't have a place - suggested category: ${suggestedCategory}`
+                        type: 'success',
+                        message: `✓ Created product "${productName}" in ${detectedCategory} (ID: ${newId})`
                     });
                 } else {
                     results.push({
                         type: 'warning',
-                        message: `${filename} doesn't have a place - suggested category: other`
+                        message: `⚠ Could not determine category for ${filename}`
                     });
                 }
             }
-        });
+        }
+        
+        // Save updated products if any were created
+        if (updatedCount > 0) {
+            await fs.writeFile(DATA_FILE, JSON.stringify(products, null, 2));
+        }
         
         res.json({ 
             success: true,
