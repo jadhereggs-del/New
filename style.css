@@ -193,6 +193,30 @@ body {
 .whatsapp-number {
     font-family: 'Courier New', monospace;
     letter-spacing: 1px;
+    color: #25d366;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    padding: 8px 15px;
+    border-radius: 20px;
+    background: rgba(37, 211, 102, 0.1);
+    border: 2px solid rgba(37, 211, 102, 0.3);
+    display: inline-block;
+    margin-left: 10px;
+}
+
+.whatsapp-number:hover {
+    color: #ffffff;
+    background: #25d366;
+    border-color: #25d366;
+    text-decoration: none;
+    transform: scale(1.05);
+    box-shadow: 0 5px 15px rgba(37, 211, 102, 0.4);
+}
+
+.whatsapp-number:active {
+    transform: scale(0.98);
 }
 
 /* Store Description */
