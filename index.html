@@ -13,6 +13,22 @@
         <p>Loading Store...</p>
     </div>
 
+    <!-- Global Cart Tracker -->
+    <div id="global-cart-tracker" class="global-cart-tracker" style="display: none;">
+        <div class="global-cart-content">
+            <div class="global-cart-info">
+                <span class="cart-icon">🛒</span>
+                <span class="global-cart-text">Selected: <span id="global-cart-count">0</span> items</span>
+            </div>
+            <div class="global-cart-actions">
+                <button id="global-view-cart" class="global-view-btn">View Cart</button>
+                <button id="global-finish-btn" class="global-finish-btn">Finish Order</button>
+                <button id="global-clear-cart" class="global-clear-btn">Clear All</button>
+            </div>
+        </div>
+        <div id="global-cart-items" class="global-cart-items" style="display: none;"></div>
+    </div>
+
     <!-- Admin Button (Hidden) -->
     <button id="admin-btn" class="admin-btn">Admin</button>
 
