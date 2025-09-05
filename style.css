@@ -987,6 +987,7 @@ body {
     padding: 8px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     color: white;
+    gap: 15px;
 }
 
 .global-cart-item:last-child {
@@ -1028,6 +1029,27 @@ body {
 .global-cart-item-remove:hover {
     background: #da190b;
     transform: scale(1.1);
+}
+
+.global-cart-item-price {
+    color: #4CAF50;
+    font-weight: bold;
+    font-size: 14px;
+    min-width: 60px;
+    text-align: right;
+}
+
+.global-cart-total {
+    border-top: 2px solid rgba(255, 255, 255, 0.2);
+    margin-top: 10px;
+    padding-top: 10px;
+    text-align: center;
+}
+
+.global-cart-total-text {
+    color: #4CAF50;
+    font-size: 16px;
+    font-weight: 500;
 }
 
 /* Responsive adjustments for global cart */
