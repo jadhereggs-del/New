@@ -28,12 +28,20 @@ async function loadProducts() {
         const response = await fetch('/api/products');
         productsData = await response.json();
         
-        // Update search products for "other" category
-        allProducts = productsData.other.map(product => ({
-            name: product.name,
-            id: product.id,
-            keywords: generateSearchKeywords(product.name)
-        }));
+        // Update search products for ALL categories
+        allProducts = [];
+        Object.keys(productsData).forEach(category => {
+            if (productsData[category] && Array.isArray(productsData[category])) {
+                productsData[category].forEach(product => {
+                    allProducts.push({
+                        name: product.name,
+                        id: product.id,
+                        category: category,
+                        keywords: generateSearchKeywords(product.name)
+                    });
+                });
+            }
+        });
         
         // Update HTML with loaded products
         updateProductsDisplay();
@@ -65,12 +73,20 @@ function updateProductsDisplay() {
     // Update event listeners after displaying products
     updateProductEventListeners();
     
-    // Update search products for "other" category
-    allProducts = productsData.other ? productsData.other.map(product => ({
-        name: product.name,
-        id: product.id,
-        keywords: generateSearchKeywords(product.name)
-    })) : [];
+    // Update search products for ALL categories
+    allProducts = [];
+    Object.keys(productsData).forEach(category => {
+        if (productsData[category] && Array.isArray(productsData[category])) {
+            productsData[category].forEach(product => {
+                allProducts.push({
+                    name: product.name,
+                    id: product.id,
+                    category: category,
+                    keywords: generateSearchKeywords(product.name)
+                });
+            });
+        }
+    });
 }
 
 // Initialize all event listeners
@@ -291,9 +307,10 @@ function displaySearchResults(matches, resultsContainer, searchInputId = 'search
         matches.slice(0, 5).forEach(match => { // Show top 5 matches
             const resultItem = document.createElement('div');
             resultItem.className = 'search-result-item';
+            const categoryDisplay = match.product.category.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
             resultItem.innerHTML = `
                 <strong>${match.product.name}</strong><br>
-                <small>ID: ${match.product.id} | Match: ${match.matchedKeyword}</small>
+                <small>ID: ${match.product.id} | Located in: ${categoryDisplay}</small>
             `;
             resultItem.addEventListener('click', function() {
                 selectProductByName(match.product.name);
@@ -312,11 +329,23 @@ function displaySearchResults(matches, resultsContainer, searchInputId = 'search
 
 // Select product by name
 function selectProductByName(productName) {
-    const productCard = document.querySelector(`[data-product="${productName}"]`);
-    if (productCard) {
-        selectProduct(productCard);
-        productCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    // First find the product in our search data to get its category
+    const productData = allProducts.find(p => p.name === productName);
+    if (!productData) return;
+    
+    // Navigate to the correct category section
+    navigateToSection(productData.category);
+    
+    // Wait a bit for the section to become active, then find and select the product
+    setTimeout(() => {
+        const productCard = document.querySelector(`[data-product="${productName}"]`);
+        if (productCard) {
+            selectProduct(productCard);
+            productCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Add visual emphasis
+            productCard.style.animation = 'pulse 2s ease';
+        }
+    }, 100);
 }
 
 // Product selection (now supports multiple items)
@@ -326,7 +355,8 @@ function selectProduct(productElement) {
     
     const product = {
         name: productElement.getAttribute('data-product'),
-        id: productElement.getAttribute('data-id')
+        id: productElement.getAttribute('data-id'),
+        price: parseFloat(productElement.getAttribute('data-price')) || 0
     };
 
     // Initialize cart for this section if not exists
@@ -387,12 +417,20 @@ function redirectToWhatsApp() {
     if (allSelectedProducts.length === 0) return;
     
     let message = `Hello! I'm interested in purchasing the following items from your electronics store:\n\n`;
+    let totalPrice = 0;
     
     allSelectedProducts.forEach((product, index) => {
-        message += `${index + 1}. ${product.name} (Product ID: ${product.id})\n`;
+        const price = product.price || 0;
+        totalPrice += price;
+        const priceText = price > 0 ? ` - $${price.toFixed(2)}` : ' - Price TBD';
+        message += `${index + 1}. ${product.name} (ID: ${product.id})${priceText}\n`;
     });
     
-    message += `\nPlease let me know about availability and pricing. Thank you!`;
+    if (totalPrice > 0) {
+        message += `\nSubtotal: $${totalPrice.toFixed(2)}`;
+    }
+    
+    message += `\n\nPlease let me know about availability and final pricing. Thank you!`;
     
     const phoneNumber = '+9613095233';
     const whatsappUrl = `https://wa.me/${phoneNumber.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`;
@@ -717,6 +755,7 @@ function addProductToGrid(product, category) {
     productCard.className = 'product-card selectable';
     productCard.setAttribute('data-product', product.name);
     productCard.setAttribute('data-id', product.id);
+    productCard.setAttribute('data-price', product.price || '0');
     
     // Don't add event listener here - it will be added by updateProductEventListeners
     
@@ -1049,10 +1088,18 @@ function removeFromCart(sectionId, productId) {
     if (index !== -1) {
         selectedProducts[sectionId].splice(index, 1);
         
-        // Remove visual selection from product card
-        const productCard = document.querySelector(`[data-id="${productId}"]`);
-        if (productCard) {
-            productCard.classList.remove('selected');
+        // Remove visual selection from product card - look in specific section
+        const sectionElement = document.getElementById(sectionId);
+        if (sectionElement) {
+            const productCard = sectionElement.querySelector(`[data-id="${productId}"]`);
+            if (productCard) {
+                productCard.classList.remove('selected');
+            }
+        }
+        // Also try to find it in any other section as fallback
+        const anyProductCard = document.querySelector(`[data-id="${productId}"]`);
+        if (anyProductCard) {
+            anyProductCard.classList.remove('selected');
         }
         
         updateCartDisplay(sectionId);
@@ -1157,16 +1204,21 @@ function updateGlobalCartTracker() {
     const globalCartTracker = document.getElementById('global-cart-tracker');
     const globalCartCount = document.getElementById('global-cart-count');
     
-    // Calculate total items across all categories
+    // Calculate total items and total price across all categories
     let totalItems = 0;
+    let totalPrice = 0;
     Object.keys(selectedProducts).forEach(category => {
-        totalItems += (selectedProducts[category] || []).length;
+        const products = selectedProducts[category] || [];
+        totalItems += products.length;
+        products.forEach(product => {
+            totalPrice += product.price || 0;
+        });
     });
     
     // Show/hide global cart tracker
     if (totalItems > 0) {
         globalCartTracker.style.display = 'block';
-        globalCartCount.textContent = totalItems;
+        globalCartCount.textContent = `${totalItems} items - $${totalPrice.toFixed(2)}`;
         document.body.classList.add('global-cart-visible');
     } else {
         globalCartTracker.style.display = 'none';
@@ -1212,9 +1264,12 @@ function showGlobalCartItems() {
     // Build cart items HTML
     globalCartItems.innerHTML = '';
     
+    let totalPrice = 0;
+    
     Object.keys(selectedProducts).forEach(category => {
         const products = selectedProducts[category] || [];
         products.forEach(product => {
+            totalPrice += product.price || 0;
             const cartItem = document.createElement('div');
             cartItem.className = 'global-cart-item';
             cartItem.innerHTML = `
@@ -1222,6 +1277,7 @@ function showGlobalCartItems() {
                     <div class="global-cart-item-name">${product.name} (ID: ${product.id})</div>
                     <div class="global-cart-item-category">${category.replace('-', ' ')}</div>
                 </div>
+                <div class="global-cart-item-price">$${(product.price || 0).toFixed(2)}</div>
                 <button class="global-cart-item-remove" data-category="${category}" data-id="${product.id}">×</button>
             `;
             
@@ -1230,11 +1286,27 @@ function showGlobalCartItems() {
                 const categoryId = this.getAttribute('data-category');
                 const productId = this.getAttribute('data-id');
                 removeFromCart(categoryId, productId);
+                
+                // Refresh the global cart display if it's currently showing
+                const globalCartItems = document.getElementById('global-cart-items');
+                if (globalCartItems.style.display !== 'none') {
+                    showGlobalCartItems();
+                }
             });
             
             globalCartItems.appendChild(cartItem);
         });
     });
+    
+    // Add total price display
+    if (totalPrice > 0) {
+        const totalItem = document.createElement('div');
+        totalItem.className = 'global-cart-total';
+        totalItem.innerHTML = `
+            <div class="global-cart-total-text">Total: <strong>$${totalPrice.toFixed(2)}</strong></div>
+        `;
+        globalCartItems.appendChild(totalItem);
+    }
     
     globalCartItems.style.display = 'block';
     globalViewBtn.textContent = 'Hide Cart';
@@ -1249,9 +1321,21 @@ function hideGlobalCartItems() {
 }
 
 function clearAllCarts() {
+    // Remove 'selected' class from ALL product cards on the entire page
+    const allProductCards = document.querySelectorAll('.product-card');
+    allProductCards.forEach(card => {
+        card.classList.remove('selected');
+    });
+    
     // Clear all categories
     Object.keys(selectedProducts).forEach(category => {
-        clearCart(category);
+        if (selectedProducts[category]) {
+            // Clear the category array
+            selectedProducts[category] = [];
+            
+            // Update the individual category display
+            updateCartDisplay(category);
+        }
     });
     
     // Update global tracker
