@@ -15,11 +15,12 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeEventListeners();
     setupSearch();
     setupIdSearch();
-    setupHomepageIdSearch();
     setupRunAllImages();
     setupCartFunctionality();
     setupGlobalCartTracker();
     setupAdminPanel();
+    setupBulkUpload();
+    setupDuplicateRemoval();
 });
 
 // Load products from backend
@@ -52,7 +53,7 @@ async function loadProducts() {
 
 // Update products display in HTML
 function updateProductsDisplay() {
-    const categories = ['fridges', 'cloth-washers', 'acs', 'fans', 'dish-washers', 'other'];
+    const categories = ['fridges', 'cloth-washers', 'acs', 'fans', 'dish-washers', 'water-dispensers', 'other'];
     
     categories.forEach(category => {
         const section = document.getElementById(category);
@@ -167,7 +168,7 @@ document.head.appendChild(style);
 // Search functionality with fuzzy matching and ID search - now works for all categories
 function setupSearch() {
     // Setup search for all categories
-    const categories = ['other', 'fridges', 'cloth-washers', 'acs', 'fans', 'dish-washers', 'homepage'];
+    const categories = ['other', 'fridges', 'cloth-washers', 'acs', 'fans', 'dish-washers', 'water-dispensers', 'homepage'];
     
     categories.forEach(category => {
         const searchInputId = category === 'homepage' ? 'homepage-search-input' : `${category}-search-input`;
@@ -495,6 +496,306 @@ function setupAdminPanel() {
     });
 }
 
+// Setup bulk upload functionality
+function setupBulkUpload() {
+    const bulkImagesInput = document.getElementById('bulk-product-images');
+    const bulkContainer = document.getElementById('bulk-products-container');
+    const bulkProductsList = document.getElementById('bulk-products-list');
+    const bulkCategorySelect = document.getElementById('bulk-category');
+    const applyBulkCategoryBtn = document.getElementById('apply-bulk-category');
+    const submitBulkProductsBtn = document.getElementById('submit-bulk-products');
+    
+    let selectedFiles = [];
+    
+    bulkImagesInput.addEventListener('change', function(e) {
+        selectedFiles = Array.from(e.target.files);
+        if (selectedFiles.length > 0) {
+            displayBulkProducts();
+            bulkContainer.style.display = 'block';
+        }
+    });
+    
+    applyBulkCategoryBtn.addEventListener('click', function() {
+        const category = bulkCategorySelect.value;
+        if (category) {
+            document.querySelectorAll('.bulk-product-category').forEach(select => {
+                select.value = category;
+            });
+        }
+    });
+    
+    submitBulkProductsBtn.addEventListener('click', function() {
+        uploadBulkProducts();
+    });
+    
+    function displayBulkProducts() {
+        bulkProductsList.innerHTML = '';
+        
+        selectedFiles.forEach((file, index) => {
+            const productItem = document.createElement('div');
+            productItem.className = 'bulk-product-item';
+            productItem.innerHTML = `
+                <img src="${URL.createObjectURL(file)}" alt="Product ${index + 1}" class="bulk-product-image">
+                <div class="bulk-product-form">
+                    <input type="text" placeholder="Product Name" class="bulk-product-name" data-index="${index}" required>
+                    <textarea placeholder="Product Description" class="bulk-product-description" data-index="${index}"></textarea>
+                    <input type="number" placeholder="Price (optional)" step="0.01" min="0" class="bulk-product-price" data-index="${index}">
+                    <select class="bulk-product-category" data-index="${index}" required>
+                        <option value="">Select Category</option>
+                        <option value="fridges">Fridges</option>
+                        <option value="cloth-washers">Cloth Washers</option>
+                        <option value="acs">ACs</option>
+                        <option value="fans">Fans</option>
+                        <option value="dish-washers">Dish Washers</option>
+                        <option value="water-dispensers">Water Dispensers</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+            `;
+            bulkProductsList.appendChild(productItem);
+        });
+    }
+    
+    async function uploadBulkProducts() {
+        const progressContainer = document.getElementById('bulk-upload-progress');
+        const progressFill = document.querySelector('.progress-fill');
+        const progressText = document.querySelector('.progress-text');
+        
+        const products = [];
+        let hasErrors = false;
+        
+        // Validate all products first
+        selectedFiles.forEach((file, index) => {
+            const name = document.querySelector(`.bulk-product-name[data-index="${index}"]`).value.trim();
+            const description = document.querySelector(`.bulk-product-description[data-index="${index}"]`).value.trim();
+            const price = document.querySelector(`.bulk-product-price[data-index="${index}"]`).value.trim();
+            const category = document.querySelector(`.bulk-product-category[data-index="${index}"]`).value;
+            
+            if (!name || !category) {
+                alert(`Product ${index + 1}: Please fill in name and select category`);
+                hasErrors = true;
+                return;
+            }
+            
+            products.push({
+                file,
+                name,
+                description: description || 'No description',
+                price: price || null,
+                category
+            });
+        });
+        
+        if (hasErrors) return;
+        
+        progressContainer.style.display = 'block';
+        submitBulkProductsBtn.disabled = true;
+        
+        let completedUploads = 0;
+        const totalUploads = products.length;
+        
+        // Upload products in parallel (max 3 at a time to avoid overwhelming the server)
+        const uploadPromises = [];
+        const batchSize = 3;
+        
+        for (let i = 0; i < products.length; i += batchSize) {
+            const batch = products.slice(i, i + batchSize);
+            const batchPromises = batch.map(async (product) => {
+                try {
+                    await uploadSingleProduct(product);
+                    completedUploads++;
+                    updateProgress();
+                } catch (error) {
+                    console.error('Failed to upload product:', error);
+                    alert(`Failed to upload ${product.name}: ${error.message}`);
+                }
+            });
+            uploadPromises.push(...batchPromises);
+            
+            // Wait for current batch before starting next batch
+            await Promise.all(batchPromises);
+        }
+        
+        function updateProgress() {
+            const percentage = (completedUploads / totalUploads) * 100;
+            progressFill.style.width = percentage + '%';
+            progressText.textContent = `Uploading... ${completedUploads}/${totalUploads}`;
+        }
+        
+        try {
+            await Promise.all(uploadPromises);
+            alert(`Successfully uploaded ${completedUploads} products!`);
+            
+            // Reset form
+            bulkImagesInput.value = '';
+            bulkContainer.style.display = 'none';
+            progressContainer.style.display = 'none';
+            progressFill.style.width = '0%';
+            
+            // Reload products
+            await loadProducts();
+            
+        } catch (error) {
+            console.error('Bulk upload error:', error);
+        } finally {
+            submitBulkProductsBtn.disabled = false;
+        }
+    }
+    
+    async function uploadSingleProduct(product) {
+        // First upload the image
+        const formData = new FormData();
+        formData.append('image', product.file);
+        formData.append('category', product.category);
+        formData.append('productName', product.name);
+        formData.append('price', product.price || '0');
+        formData.append('description', product.description);
+        
+        const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const uploadResult = await uploadResponse.json();
+        
+        if (!uploadResponse.ok) {
+            throw new Error(uploadResult.error || 'Failed to upload image');
+        }
+        
+        // Then add the product
+        const response = await fetch('/api/products', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name: product.name,
+                description: product.description,
+                category: product.category,
+                price: product.price,
+                imageUrl: uploadResult.imageUrl,
+                password: '9890'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to add product');
+        }
+        
+        return result;
+    }
+}
+
+// Setup duplicate removal functionality
+function setupDuplicateRemoval() {
+    const scanDuplicatesBtn = document.getElementById('scan-duplicates-btn');
+    const duplicatesResults = document.getElementById('duplicates-results');
+    
+    scanDuplicatesBtn.addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = 'Scanning...';
+        duplicatesResults.style.display = 'none';
+        
+        try {
+            const response = await fetch('/api/scan-duplicates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    password: '9890'
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                displayDuplicates(result.duplicates);
+            } else {
+                alert(result.error || 'Failed to scan for duplicates');
+            }
+        } catch (error) {
+            alert('Failed to scan for duplicates: ' + error.message);
+        } finally {
+            this.disabled = false;
+            this.textContent = 'Scan for Duplicates';
+        }
+    });
+    
+    function displayDuplicates(duplicates) {
+        duplicatesResults.innerHTML = '';
+        
+        if (duplicates.length === 0) {
+            duplicatesResults.innerHTML = '<p style="color: #27ae60;">✅ No duplicate images found!</p>';
+        } else {
+            let totalDuplicatesToRemove = 0;
+            
+            duplicates.forEach((group, index) => {
+                totalDuplicatesToRemove += group.files.length - 1; // Keep one, remove the rest
+                
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'duplicate-group';
+                groupDiv.innerHTML = `
+                    <div class="duplicate-info">
+                        <strong>Duplicate Group ${index + 1}</strong> (${group.files.length} identical images)<br>
+                        Size: ${(group.size / 1024).toFixed(1)} KB | Will keep: ${group.files[0].name}
+                    </div>
+                    <div class="duplicate-images">
+                        ${group.files.map(file => `<img src="${file.url}" alt="${file.name}" class="duplicate-image" title="${file.name}">`).join('')}
+                    </div>
+                `;
+                duplicatesResults.appendChild(groupDiv);
+            });
+            
+            const summaryDiv = document.createElement('div');
+            summaryDiv.innerHTML = `
+                <div class="duplicate-info">
+                    <strong>Summary:</strong> Found ${duplicates.length} duplicate groups with ${totalDuplicatesToRemove} images to remove.
+                </div>
+                <button class="admin-btn-action remove-duplicates-btn" onclick="removeDuplicates(${JSON.stringify(duplicates).replace(/"/g, '&quot;')})">
+                    Remove ${totalDuplicatesToRemove} Duplicate Images
+                </button>
+            `;
+            duplicatesResults.appendChild(summaryDiv);
+        }
+        
+        duplicatesResults.style.display = 'block';
+    }
+}
+
+// Remove duplicates function (called from button)
+async function removeDuplicates(duplicates) {
+    if (!confirm(`Are you sure you want to remove ${duplicates.reduce((sum, group) => sum + group.files.length - 1, 0)} duplicate images? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/remove-duplicates', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                duplicates: duplicates,
+                password: '9890'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(`Successfully removed ${result.removedCount} duplicate images!`);
+            document.getElementById('duplicates-results').style.display = 'none';
+        } else {
+            alert(result.error || 'Failed to remove duplicates');
+        }
+    } catch (error) {
+        alert('Failed to remove duplicates: ' + error.message);
+    }
+}
+
 function previewImage(event, previewContainer) {
     const file = event.target.files[0];
     if (file) {
@@ -554,7 +855,7 @@ function cancelEdit() {
 // Admin code prompt
 function promptAdminCode() {
     const code = prompt('Enter admin code:');
-    if (code === '1234') {
+    if (code === '9890') {
         navigateToSection('admin-panel');
     } else if (code !== null) {
         alert('Incorrect code!');
@@ -607,7 +908,7 @@ async function addNewProduct() {
                 category,
                 price: price || null,
                 imageUrl: uploadResult.imageUrl,
-                password: '1234'
+                password: '9890'
             })
         });
         
@@ -701,7 +1002,7 @@ async function updateProduct() {
                 description,
                 price: price || null,
                 imageUrl,
-                password: '1234'
+                password: '9890'
             })
         });
         
@@ -858,7 +1159,7 @@ async function removeProduct() {
             body: JSON.stringify({
                 category,
                 productId,
-                password: '1234'
+                password: '9890'
             })
         });
         
@@ -969,55 +1270,6 @@ function setupIdSearch() {
     });
 }
 
-// Setup homepage ID search functionality
-function setupHomepageIdSearch() {
-    const homepageIdSearch = document.getElementById('homepage-id-search');
-    const homepageSearchBtn = document.getElementById('homepage-search-btn');
-    
-    function homepageSearchById() {
-        const searchId = homepageIdSearch.value.trim();
-        if (!searchId) {
-            alert('Please enter a product ID');
-            return;
-        }
-        
-        // Search through all categories
-        let foundProduct = null;
-        let foundCategory = null;
-        
-        for (const [category, products] of Object.entries(productsData)) {
-            const product = products.find(p => p.id === searchId);
-            if (product) {
-                foundProduct = product;
-                foundCategory = category;
-                break;
-            }
-        }
-        
-        if (foundProduct) {
-            // Navigate to the category and highlight the product
-            navigateToSection(foundCategory);
-            setTimeout(() => {
-                const productCard = document.querySelector(`[data-id="${searchId}"]`);
-                if (productCard) {
-                    productCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    productCard.style.animation = 'pulse 2s ease';
-                    selectProduct(productCard);
-                }
-            }, 500);
-            homepageIdSearch.value = '';
-        } else {
-            alert('Product with ID "' + searchId + '" not found');
-        }
-    }
-    
-    homepageSearchBtn.addEventListener('click', homepageSearchById);
-    homepageIdSearch.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            homepageSearchById();
-        }
-    });
-}
 
 // Setup cart functionality
 function setupCartFunctionality() {
