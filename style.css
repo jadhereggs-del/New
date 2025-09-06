@@ -57,22 +57,24 @@ body {
 /* Admin Button */
 .admin-btn {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.5);
-    padding: 8px 12px;
-    border-radius: 5px;
+    bottom: 5px;
+    right: 5px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.1);
+    padding: 2px 4px;
+    border-radius: 2px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 8px;
     transition: all 0.3s ease;
     z-index: 100;
+    opacity: 0.05;
 }
 
 .admin-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.3);
+    opacity: 0.2;
 }
 
 /* Sections */
@@ -818,6 +820,137 @@ body {
 
 .sync-results .info {
     color: #3498db;
+}
+
+/* Bulk Upload Section */
+.bulk-upload-section, .duplicate-removal-section {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 25px;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    margin-bottom: 20px;
+}
+
+.bulk-progress {
+    margin: 15px 0;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(45deg, #4ecdc4, #44a08d);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    color: white;
+    font-weight: 500;
+}
+
+.bulk-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.bulk-controls select {
+    flex: 1;
+    min-width: 200px;
+}
+
+.bulk-products-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.bulk-product-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 15px;
+}
+
+.bulk-product-image {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.bulk-product-form {
+    display: grid;
+    gap: 10px;
+}
+
+.bulk-product-form input,
+.bulk-product-form textarea,
+.bulk-product-form select {
+    width: 100%;
+    padding: 8px;
+    border: none;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+}
+
+.bulk-product-form textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+.duplicates-results {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin-top: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.duplicate-group {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.duplicate-images {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.duplicate-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 5px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.duplicate-info {
+    color: white;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+.remove-duplicates-btn {
+    background: #e74c3c !important;
+    margin-top: 10px;
 }
 
 /* Responsive Design */
