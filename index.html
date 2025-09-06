@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- local f-->
     <title>Electronics Store</title>
     <link href="style.css" rel="stylesheet" type="text/css" />
 </head>
@@ -55,10 +56,6 @@
                     <input type="text" id="homepage-search-input" placeholder="Search by name or Product ID" class="search-bar">
                     <div id="homepage-search-results" class="search-results"></div>
                 </div>
-                <div class="search-container">
-                    <input type="text" id="homepage-id-search" placeholder="Enter Product ID to find any item" class="search-bar">
-                    <button id="homepage-search-btn" class="search-btn">Find Product</button>
-                </div>
             </div>
             
             <div class="category-buttons">
@@ -67,6 +64,7 @@
                 <button class="category-btn" data-section="acs">ACs</button>
                 <button class="category-btn" data-section="fans">Fans</button>
                 <button class="category-btn" data-section="dish-washers">Dish Washers</button>
+                <button class="category-btn" data-section="water-dispensers">Water Dispensers</button>
                 <button class="category-btn" data-section="other">Other</button>
             </div>
         </div>
@@ -168,6 +166,25 @@
         </div>
     </section>
 
+    <section id="water-dispensers" class="section category-section">
+        <div class="container">
+            <button class="back-btn">← Back to Home</button>
+            <h2>Water Dispensers</h2>
+            <div class="search-container">
+                <input type="text" id="water-dispensers-search-input" placeholder="Search water dispensers by name or ID..." class="search-bar">
+                <div id="water-dispensers-search-results" class="search-results"></div>
+            </div>
+            <div id="water-dispensers-cart-section" class="cart-section">
+                <h3>Selected Items (<span id="water-dispensers-cart-count">0</span>)</h3>
+                <div id="water-dispensers-cart-items" class="cart-items"></div>
+                <button id="water-dispensers-clear-cart" class="clear-btn" style="display: none;">Clear All</button>
+            </div>
+            <div class="products-grid">
+            </div>
+            <button id="water-dispensers-finish-btn" class="finish-btn" style="display: none;">Finish</button>
+        </div>
+    </section>
+
     <section id="other" class="section category-section">
         <div class="container">
             <button class="back-btn">← Back to Home</button>
@@ -209,10 +226,44 @@
                             <option value="acs">ACs</option>
                             <option value="fans">Fans</option>
                             <option value="dish-washers">Dish Washers</option>
+                            <option value="water-dispensers">Water Dispensers</option>
                             <option value="other">Other</option>
                         </select>
                         <button type="submit" class="admin-btn-action">Add Product</button>
                     </form>
+                </div>
+                <div class="bulk-upload-section">
+                    <h3>📦 Bulk Upload Products</h3>
+                    <input type="file" id="bulk-product-images" accept="image/*" multiple required>
+                    <div id="bulk-upload-progress" class="bulk-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <span class="progress-text">Uploading... 0/0</span>
+                    </div>
+                    <div id="bulk-products-container" class="bulk-products-container" style="display: none;">
+                        <div class="bulk-controls">
+                            <select id="bulk-category" required>
+                                <option value="">Select Category for All</option>
+                                <option value="fridges">Fridges</option>
+                                <option value="cloth-washers">Cloth Washers</option>
+                                <option value="acs">ACs</option>
+                                <option value="fans">Fans</option>
+                                <option value="dish-washers">Dish Washers</option>
+                                <option value="water-dispensers">Water Dispensers</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <button type="button" id="apply-bulk-category" class="admin-btn-action">Apply to All</button>
+                            <button type="button" id="submit-bulk-products" class="admin-btn-action">Upload All Products</button>
+                        </div>
+                        <div id="bulk-products-list" class="bulk-products-list"></div>
+                    </div>
+                </div>
+                <div class="duplicate-removal-section">
+                    <h3>🗑️ Remove Duplicate Images</h3>
+                    <p>Scan ImageKit for duplicate images and remove them automatically</p>
+                    <button id="scan-duplicates-btn" class="admin-btn-action">Scan for Duplicates</button>
+                    <div id="duplicates-results" class="duplicates-results" style="display: none;"></div>
                 </div>
                 <div class="edit-product-section">
                     <h3>Edit Product</h3>
@@ -223,6 +274,7 @@
                         <option value="acs">ACs</option>
                         <option value="fans">Fans</option>
                         <option value="dish-washers">Dish Washers</option>
+                        <option value="water-dispensers">Water Dispensers</option>
                         <option value="other">Other</option>
                     </select>
                     <select id="edit-product" required>
@@ -248,6 +300,7 @@
                         <option value="acs">ACs</option>
                         <option value="fans">Fans</option>
                         <option value="dish-washers">Dish Washers</option>
+                        <option value="water-dispensers">Water Dispensers</option>
                         <option value="other">Other</option>
                     </select>
                     <select id="remove-product" required>
