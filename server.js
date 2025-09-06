@@ -101,6 +101,7 @@ async function initializeData() {
             acs: [],
             fans: [],
             'dish-washers': [],
+            'water-dispensers': [],
             other: []
         };
         await fs.writeFile(DATA_FILE, JSON.stringify(defaultData, null, 2));
@@ -166,6 +167,7 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
             'acs': 'ac',
             'fans': 'fan',
             'dish-washers': 'dishwash',
+            'water-dispensers': 'waterdispenser',
             'other': 'other'
         };
         
@@ -235,7 +237,7 @@ app.post('/api/products', async (req, res) => {
         const { name, description, category, password, imageUrl, price } = req.body;
 
         // Verify password
-        if (password !== '1234') {
+        if (password !== '9890') {
             return res.status(401).json({ error: 'Incorrect password' });
         }
 
@@ -283,7 +285,7 @@ app.put('/api/products', async (req, res) => {
         const { category, productId, name, description, price, imageUrl, password } = req.body;
 
         // Verify password
-        if (password !== '1234') {
+        if (password !== '9890') {
             return res.status(401).json({ error: 'Incorrect password' });
         }
 
@@ -335,7 +337,7 @@ app.delete('/api/products', async (req, res) => {
         const { category, productId, password } = req.body;
 
         // Verify password
-        if (password !== '1234') {
+        if (password !== '9890') {
             return res.status(401).json({ error: 'Incorrect password' });
         }
 
@@ -428,7 +430,7 @@ app.get('/api/imagekit/files', async (req, res) => {
     try {
         const { password } = req.query;
         
-        if (password !== '1234') {
+        if (password !== '9890') {
             return res.status(401).json({ error: 'Unauthorized' });
         }
         
@@ -460,7 +462,7 @@ app.post('/api/run-all-images', async (req, res) => {
     try {
         const { password } = req.body;
         
-        if (password !== '1234') {
+        if (password !== '9890') {
             return res.status(401).json({ error: 'Unauthorized' });
         }
         
@@ -528,6 +530,7 @@ app.post('/api/run-all-images', async (req, res) => {
                         'ac': 'acs',
                         'fan': 'fans',
                         'dishwash': 'dish-washers',
+                        'waterdispenser': 'water-dispensers',
                         'other': 'other'
                     };
                     
@@ -545,6 +548,8 @@ app.post('/api/run-all-images', async (req, res) => {
                         detectedCategory = 'fans';
                     } else if (lowerFilename.includes('dish') || lowerFilename.includes('dishwash')) {
                         detectedCategory = 'dish-washers';
+                    } else if (lowerFilename.includes('water') || lowerFilename.includes('dispenser') || lowerFilename.includes('cooler')) {
+                        detectedCategory = 'water-dispensers';
                     } else {
                         detectedCategory = 'other';
                     }
@@ -608,6 +613,270 @@ app.post('/api/run-all-images', async (req, res) => {
         res.status(500).json({ error: 'Failed to run image sync' });
     }
 });
+
+// Scan for duplicate images
+app.post('/api/scan-duplicates', async (req, res) => {
+    try {
+        const { password } = req.body;
+        
+        if (password !== '9890') {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        const fetch = (await import('node-fetch')).default;
+        const authString = `${IMAGEKIT_CONFIG.privateKey}:`;
+        const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
+        
+        // Get all files from ImageKit
+        const response = await fetch('https://api.imagekit.io/v1/files', {
+            headers: {
+                'Authorization': authHeader
+            }
+        });
+        
+        if (!response.ok) {
+            return res.status(500).json({ error: 'Failed to fetch ImageKit files' });
+        }
+        
+        const files = await response.json();
+        
+        console.log(`Scanning ${files.length} files for duplicates...`);
+        
+        // Group files by size and name similarity to detect duplicates
+        const duplicateGroups = [];
+        const processedFiles = new Set();
+        
+        for (let i = 0; i < files.length; i++) {
+            if (processedFiles.has(files[i].fileId)) continue;
+            
+            const currentFile = files[i];
+            const similarFiles = [currentFile];
+            processedFiles.add(currentFile.fileId);
+            
+            console.log(`\nChecking file ${i + 1}/${files.length}: ${currentFile.name}`);
+            
+            // Find files with same size and similar names
+            for (let j = i + 1; j < files.length; j++) {
+                if (processedFiles.has(files[j].fileId)) continue;
+                
+                const compareFile = files[j];
+                
+                // Check if files are potential duplicates
+                if (isPotentialDuplicate(currentFile, compareFile)) {
+                    console.log(`Found duplicate: ${compareFile.name}`);
+                    similarFiles.push(compareFile);
+                    processedFiles.add(compareFile.fileId);
+                }
+            }
+            
+            // If we found duplicates (more than one similar file)
+            if (similarFiles.length > 1) {
+                console.log(`Duplicate group found with ${similarFiles.length} files`);
+                duplicateGroups.push({
+                    size: currentFile.size,
+                    files: similarFiles.map(file => ({
+                        fileId: file.fileId,
+                        name: file.name,
+                        url: file.url,
+                        uploadedAt: file.uploadedAt
+                    }))
+                });
+            }
+        }
+        
+        res.json({ 
+            success: true,
+            duplicates: duplicateGroups,
+            totalFiles: files.length,
+            duplicateGroups: duplicateGroups.length
+        });
+        
+    } catch (error) {
+        console.error('Error scanning for duplicates:', error);
+        res.status(500).json({ error: 'Failed to scan for duplicates' });
+    }
+});
+
+// Remove duplicate images
+app.post('/api/remove-duplicates', async (req, res) => {
+    try {
+        const { duplicates, password } = req.body;
+        
+        if (password !== '9890') {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        const fetch = (await import('node-fetch')).default;
+        const authString = `${IMAGEKIT_CONFIG.privateKey}:`;
+        const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
+        
+        let removedCount = 0;
+        const errors = [];
+        
+        // For each duplicate group, keep the first file and remove the rest
+        for (const group of duplicates) {
+            const filesToRemove = group.files.slice(1); // Skip first file, remove the rest
+            
+            for (const file of filesToRemove) {
+                try {
+                    const deleteResponse = await fetch(`https://api.imagekit.io/v1/files/${file.fileId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': authHeader
+                        }
+                    });
+                    
+                    if (deleteResponse.ok) {
+                        removedCount++;
+                        console.log(`Deleted duplicate: ${file.name}`);
+                    } else {
+                        const errorData = await deleteResponse.json();
+                        errors.push(`Failed to delete ${file.name}: ${errorData.message || 'Unknown error'}`);
+                    }
+                } catch (error) {
+                    errors.push(`Failed to delete ${file.name}: ${error.message}`);
+                }
+            }
+        }
+        
+        res.json({ 
+            success: true,
+            removedCount: removedCount,
+            errors: errors
+        });
+        
+    } catch (error) {
+        console.error('Error removing duplicates:', error);
+        res.status(500).json({ error: 'Failed to remove duplicates' });
+    }
+});
+
+// Helper function to determine if two files are potential duplicates
+function isPotentialDuplicate(file1, file2) {
+    // Debug logging to understand file structure
+    console.log('Comparing files:', {
+        file1: { name: file1.name, size: file1.size },
+        file2: { name: file2.name, size: file2.size }
+    });
+    
+    // Same size is a strong indicator
+    if (file1.size === file2.size) {
+        // Extract base names by removing various timestamp patterns and category prefixes
+        const cleanName1 = cleanFileName(file1.name);
+        const cleanName2 = cleanFileName(file2.name);
+        
+        console.log('Cleaned names:', { cleanName1, cleanName2 });
+        
+        // If cleaned names are identical, it's a duplicate
+        if (cleanName1 === cleanName2) {
+            console.log('Exact match found!');
+            return true;
+        }
+        
+        // Check for very similar names (Levenshtein distance)
+        const similarity = calculateStringSimilarity(cleanName1, cleanName2);
+        console.log('Name similarity:', similarity);
+        
+        if (similarity > 0.85) { // 85% similarity threshold
+            console.log('High similarity match found!');
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// Helper function to clean file names for comparison
+function cleanFileName(fileName) {
+    console.log('Original filename:', fileName);
+    
+    // Remove extension first
+    let cleaned = fileName.replace(/\.[^.]+$/, '');
+    console.log('After removing extension:', cleaned);
+    
+    // Remove ALL numeric patterns that could be unique identifiers:
+    // - Any sequence of 6+ digits (timestamps, unique IDs, etc.)
+    cleaned = cleaned.replace(/\d{6,}/g, '');
+    console.log('After removing long numbers:', cleaned);
+    
+    // Remove common separators followed by numbers (any length)
+    cleaned = cleaned.replace(/[-_]+\d+/g, '');
+    console.log('After removing separator+numbers:', cleaned);
+    
+    // Remove numbers followed by separators
+    cleaned = cleaned.replace(/\d+[-_]+/g, '');
+    console.log('After removing numbers+separators:', cleaned);
+    
+    // Remove category prefixes that might differ
+    cleaned = cleaned.replace(/^(fridges?|clothwashers?|acs?|fans?|dishwashers?|waterdispensers?|other)[-_]*/i, '');
+    console.log('After removing category prefixes:', cleaned);
+    
+    // Remove common suffixes like (1), (2), _copy, etc.
+    cleaned = cleaned.replace(/[-_]?(copy|duplicate|\(\d+\))[-_]?/gi, '');
+    console.log('After removing copy suffixes:', cleaned);
+    
+    // Remove any remaining standalone numbers
+    cleaned = cleaned.replace(/\b\d+\b/g, '');
+    console.log('After removing standalone numbers:', cleaned);
+    
+    // Remove random alphanumeric codes (like EhpCr8Lm1, wNsgNYT2r)
+    // These are typically 6+ characters mixing letters and numbers
+    cleaned = cleaned.replace(/[-_][a-zA-Z0-9]{6,}/g, '');
+    console.log('After removing random codes:', cleaned);
+    
+    // Remove any remaining short alphanumeric sequences at word boundaries
+    cleaned = cleaned.replace(/\b[a-zA-Z0-9]{3,8}\b/g, '');
+    console.log('After removing short codes:', cleaned);
+    
+    // Clean up any remaining multiple separators
+    cleaned = cleaned.replace(/[-_]{2,}/g, '-');
+    cleaned = cleaned.replace(/^[-_]+|[-_]+$/g, ''); // Remove leading/trailing separators
+    
+    const final = cleaned.toLowerCase().trim();
+    console.log('Final cleaned name:', final);
+    
+    return final;
+}
+
+// Helper function to calculate string similarity
+function calculateStringSimilarity(str1, str2) {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const distance = levenshteinDistance(longer, shorter);
+    return (longer.length - distance) / longer.length;
+}
+
+// Helper function for Levenshtein distance
+function levenshteinDistance(str1, str2) {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+        matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+        matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+        for (let j = 1; j <= str1.length; j++) {
+            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
+                );
+            }
+        }
+    }
+    
+    return matrix[str2.length][str1.length];
+}
 
 // Start server
 async function startServer() {
