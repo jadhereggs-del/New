@@ -731,16 +731,19 @@ function setupDuplicateRemoval() {
             duplicatesResults.innerHTML = '<p style="color: #27ae60;">✅ No duplicate images found!</p>';
         } else {
             let totalDuplicatesToRemove = 0;
+            let totalProductsToRemove = 0;
             
             duplicates.forEach((group, index) => {
                 totalDuplicatesToRemove += group.files.length - 1; // Keep one, remove the rest
+                totalProductsToRemove += group.files.length - 1; // Estimate products to remove
                 
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'duplicate-group';
                 groupDiv.innerHTML = `
                     <div class="duplicate-info">
                         <strong>Duplicate Group ${index + 1}</strong> (${group.files.length} identical images)<br>
-                        Size: ${(group.size / 1024).toFixed(1)} KB | Will keep: ${group.files[0].name}
+                        Size: ${(group.size / 1024).toFixed(1)} KB | Will keep: ${group.files[0].name}<br>
+                        <span style="color: #e74c3c;">Will remove ${group.files.length - 1} duplicate images and their products</span>
                     </div>
                     <div class="duplicate-images">
                         ${group.files.map(file => `<img src="${file.url}" alt="${file.name}" class="duplicate-image" title="${file.name}">`).join('')}
@@ -752,10 +755,11 @@ function setupDuplicateRemoval() {
             const summaryDiv = document.createElement('div');
             summaryDiv.innerHTML = `
                 <div class="duplicate-info">
-                    <strong>Summary:</strong> Found ${duplicates.length} duplicate groups with ${totalDuplicatesToRemove} images to remove.
+                    <strong>Summary:</strong> Found ${duplicates.length} duplicate groups.<br>
+                    <span style="color: #e74c3c;">⚠️ Will remove ${totalDuplicatesToRemove} duplicate images and their associated products from both ImageKit and website!</span>
                 </div>
                 <button class="admin-btn-action remove-duplicates-btn" onclick="removeDuplicates(${JSON.stringify(duplicates).replace(/"/g, '&quot;')})">
-                    Remove ${totalDuplicatesToRemove} Duplicate Images
+                    🗑️ Remove ${totalDuplicatesToRemove} Duplicates (Images + Products)
                 </button>
             `;
             duplicatesResults.appendChild(summaryDiv);
@@ -767,7 +771,9 @@ function setupDuplicateRemoval() {
 
 // Remove duplicates function (called from button)
 async function removeDuplicates(duplicates) {
-    if (!confirm(`Are you sure you want to remove ${duplicates.reduce((sum, group) => sum + group.files.length - 1, 0)} duplicate images? This action cannot be undone.`)) {
+    const totalImagesToRemove = duplicates.reduce((sum, group) => sum + group.files.length - 1, 0);
+    
+    if (!confirm(`⚠️ WARNING: This will remove ${totalImagesToRemove} duplicate images AND their associated products from both ImageKit and your website database.\n\nThis action cannot be undone. Are you sure you want to continue?`)) {
         return;
     }
     
@@ -786,8 +792,11 @@ async function removeDuplicates(duplicates) {
         const result = await response.json();
         
         if (response.ok) {
-            alert(`Successfully removed ${result.removedCount} duplicate images!`);
+            alert(`✅ Successfully removed:\n• ${result.removedImagesCount} duplicate images from ImageKit\n• ${result.removedProductsCount} duplicate products from website\n\n${result.message}`);
             document.getElementById('duplicates-results').style.display = 'none';
+            
+            // Reload products to reflect changes
+            loadProducts();
         } else {
             alert(result.error || 'Failed to remove duplicates');
         }
@@ -1449,6 +1458,121 @@ function setupRunAllImages() {
             this.disabled = false;
         }
     });
+    
+    // Setup auto-sync controls
+    setupAutoSyncControls();
+}
+
+// Setup auto-sync controls (permanent mode)
+function setupAutoSyncControls() {
+    const checkBtn = document.getElementById('check-auto-sync-btn');
+    const statusDiv = document.getElementById('auto-sync-status');
+    let countdownInterval = null;
+    
+    if (!checkBtn || !statusDiv) return;
+    
+    // Update countdown display
+    function updateCountdown(seconds) {
+        if (seconds <= 0) {
+            return 'Running now...';
+        }
+        
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        
+        if (minutes > 0) {
+            return `Next sync in ${minutes}m ${remainingSeconds}s`;
+        } else {
+            return `Next sync in ${remainingSeconds}s`;
+        }
+    }
+    
+    // Start countdown timer
+    function startCountdown(initialSeconds) {
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
+        
+        let timeLeft = initialSeconds;
+        
+        countdownInterval = setInterval(() => {
+            timeLeft--;
+            
+            if (timeLeft <= 0) {
+                clearInterval(countdownInterval);
+                // Automatically check status when countdown reaches 0
+                setTimeout(() => {
+                    checkBtn.click();
+                }, 2000); // Wait 2 seconds after sync should have run
+                return;
+            }
+            
+            const countdownText = updateCountdown(timeLeft);
+            const currentStatus = statusDiv.innerHTML;
+            const baseStatus = currentStatus.split('<br>')[0];
+            statusDiv.innerHTML = `${baseStatus}<br><small style="font-weight: normal; opacity: 0.8;">${countdownText}</small>`;
+        }, 1000);
+    }
+    
+    // Check status
+    checkBtn.addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = 'Checking...';
+        
+        try {
+            const response = await fetch('/api/auto-sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: 'status', password: '9890' })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                const statusIcon = result.isRunning ? '🟢' : '🔴';
+                const baseMessage = `${statusIcon} ${result.message}`;
+                
+                if (result.isRunning && result.nextSyncIn) {
+                    const countdownText = updateCountdown(result.nextSyncIn);
+                    statusDiv.innerHTML = `${baseMessage}<br><small style="font-weight: normal; opacity: 0.8;">${countdownText}</small>`;
+                    startCountdown(result.nextSyncIn);
+                } else {
+                    statusDiv.innerHTML = baseMessage;
+                }
+                
+                statusDiv.style.color = result.isRunning ? '#27ae60' : '#e74c3c';
+            } else {
+                statusDiv.innerHTML = `🔴 Error: ${result.error}`;
+                statusDiv.style.color = '#e74c3c';
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                }
+            }
+        } catch (error) {
+            statusDiv.innerHTML = `🔴 Error: ${error.message}`;
+            statusDiv.style.color = '#e74c3c';
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+        } finally {
+            this.disabled = false;
+            this.textContent = 'Check Status';
+        }
+    });
+    
+    // Check status on page load
+    setTimeout(() => {
+        checkBtn.click();
+    }, 1000);
+    
+    // Auto-refresh status every 30 seconds to keep countdown accurate
+    setInterval(() => {
+        if (document.getElementById('admin-panel').classList.contains('active')) {
+            checkBtn.click();
+        }
+    }, 30000);
 }
 
 // Global Cart Tracker Functions
