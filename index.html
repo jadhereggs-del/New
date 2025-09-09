@@ -311,8 +311,17 @@
                 <div class="sync-images-section">
                     <h3>Sync Images</h3>
                     <p>Upload all images from ImageKit that aren't currently assigned to products</p>
-                    <button id="run-all-images-btn" class="admin-btn-action sync-btn">Run All Images</button>
+                    <button id="run-all-images-btn" class="admin-btn-action sync-btn">Run All Images (One Time)</button>
                     <div id="sync-results" class="sync-results"></div>
+                    
+                    <div class="auto-sync-section" style="margin-top: 20px; padding: 15px; border: 2px solid #27ae60; border-radius: 8px; background-color: #f8f9fa;">
+                        <h4 style="color: #27ae60; margin-top: 0;">🔄 Automatic Sync (Always On)</h4>
+                        <p style="margin: 10px 0;">✅ Image sync runs automatically every 1-5 minutes permanently</p>
+                        <div class="auto-sync-controls">
+                            <button id="check-auto-sync-btn" class="admin-btn-action" style="background-color: #f39c12;">Check Status</button>
+                        </div>
+                        <div id="auto-sync-status" class="auto-sync-status" style="margin-top: 10px; padding: 10px; background-color: #d5f4e6; border-radius: 5px; font-weight: bold; color: #27ae60;">🟢 Auto-sync is running permanently in the background</div>
+                    </div>
                 </div>
             </div>
         </div>
