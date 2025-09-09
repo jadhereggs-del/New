@@ -711,14 +711,42 @@ app.post('/api/remove-duplicates', async (req, res) => {
         const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
         
         let removedCount = 0;
+        let productsRemovedCount = 0;
         const errors = [];
+        
+        // Read current products data
+        const data = await fs.readFile(DATA_FILE, 'utf8');
+        const products = JSON.parse(data);
         
         // For each duplicate group, keep the first file and remove the rest
         for (const group of duplicates) {
-            const filesToRemove = group.files.slice(1); // Skip first file, remove the rest
+            const filesToKeep = group.files[0]; // Keep the first file
+            const filesToRemove = group.files.slice(1); // Remove the rest
+            
+            console.log(`Processing duplicate group: keeping ${filesToKeep.name}, removing ${filesToRemove.length} duplicates`);
             
             for (const file of filesToRemove) {
                 try {
+                    // First, find and remove products that use this image
+                    const filename = file.name;
+                    const imageUrlToRemove = `/api/images/${filename}`;
+                    
+                    // Search through all categories for products using this image
+                    Object.keys(products).forEach(category => {
+                        if (products[category] && Array.isArray(products[category])) {
+                            const originalLength = products[category].length;
+                            products[category] = products[category].filter(product => {
+                                if (product.imageUrl === imageUrlToRemove) {
+                                    console.log(`Removing duplicate product: ${product.name} (ID: ${product.id}) from ${category}`);
+                                    productsRemovedCount++;
+                                    return false; // Remove this product
+                                }
+                                return true; // Keep this product
+                            });
+                        }
+                    });
+                    
+                    // Then delete the image from ImageKit
                     const deleteResponse = await fetch(`https://api.imagekit.io/v1/files/${file.fileId}`, {
                         method: 'DELETE',
                         headers: {
@@ -728,10 +756,10 @@ app.post('/api/remove-duplicates', async (req, res) => {
                     
                     if (deleteResponse.ok) {
                         removedCount++;
-                        console.log(`Deleted duplicate: ${file.name}`);
+                        console.log(`Deleted duplicate image: ${file.name}`);
                     } else {
                         const errorData = await deleteResponse.json();
-                        errors.push(`Failed to delete ${file.name}: ${errorData.message || 'Unknown error'}`);
+                        errors.push(`Failed to delete image ${file.name}: ${errorData.message || 'Unknown error'}`);
                     }
                 } catch (error) {
                     errors.push(`Failed to delete ${file.name}: ${error.message}`);
@@ -739,10 +767,16 @@ app.post('/api/remove-duplicates', async (req, res) => {
             }
         }
         
+        // Save updated products data
+        await fs.writeFile(DATA_FILE, JSON.stringify(products, null, 2));
+        console.log(`Removed ${productsRemovedCount} duplicate products from database`);
+        
         res.json({ 
             success: true,
-            removedCount: removedCount,
-            errors: errors
+            removedImagesCount: removedCount,
+            removedProductsCount: productsRemovedCount,
+            errors: errors,
+            message: `Successfully removed ${removedCount} duplicate images and ${productsRemovedCount} duplicate products`
         });
         
     } catch (error) {
@@ -878,12 +912,231 @@ function levenshteinDistance(str1, str2) {
     return matrix[str2.length][str1.length];
 }
 
+// Automatic sync state
+let autoSyncInterval = null;
+let isAutoSyncRunning = false;
+let nextSyncTime = null;
+
+// Auto-sync status endpoint (permanent mode)
+app.post('/api/auto-sync', async (req, res) => {
+    try {
+        const { action, password } = req.body;
+        
+        if (password !== '9890') {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        if (action === 'start') {
+            res.json({ 
+                success: true, 
+                message: 'Auto-sync is running permanently (cannot be stopped)',
+                isPermanent: true
+            });
+            
+        } else if (action === 'stop') {
+            res.json({ 
+                success: false, 
+                message: 'Auto-sync is running permanently and cannot be stopped',
+                isPermanent: true
+            });
+            
+        } else if (action === 'status') {
+            const timeLeft = nextSyncTime ? Math.max(0, Math.ceil((nextSyncTime - Date.now()) / 1000)) : 0;
+            res.json({ 
+                success: true, 
+                isRunning: isAutoSyncRunning,
+                message: 'Auto-sync is running permanently in the background',
+                isPermanent: true,
+                nextSyncIn: timeLeft
+            });
+        } else {
+            res.status(400).json({ error: 'Invalid action. Use start, stop, or status' });
+        }
+        
+    } catch (error) {
+        console.error('Auto-sync error:', error);
+        res.status(500).json({ error: 'Failed to manage auto-sync' });
+    }
+});
+
+// Extract the run all images logic into a reusable function
+async function runAllImagesSync() {
+    try {
+        const fetch = (await import('node-fetch')).default;
+        const authString = `${IMAGEKIT_CONFIG.privateKey}:`;
+        const authHeader = `Basic ${Buffer.from(authString).toString('base64')}`;
+        
+        // Get all files from ImageKit
+        const response = await fetch('https://api.imagekit.io/v1/files', {
+            headers: {
+                'Authorization': authHeader
+            }
+        });
+        
+        if (!response.ok) {
+            console.warn('Auto-sync: Failed to fetch ImageKit files');
+            return { success: false, error: 'Failed to fetch ImageKit files' };
+        }
+        
+        const imageKitFiles = await response.json();
+        
+        // Read current products
+        const data = await fs.readFile(DATA_FILE, 'utf8');
+        const products = JSON.parse(data);
+        
+        let updatedCount = 0;
+        
+        // Check each ImageKit file and auto-create products
+        for (const file of imageKitFiles) {
+            const filename = file.name;
+            let foundMatch = false;
+            
+            // Search through all categories for a product using this image
+            Object.keys(products).forEach(category => {
+                products[category].forEach(product => {
+                    if (product.imageUrl && product.imageUrl.includes(filename)) {
+                        foundMatch = true;
+                    }
+                });
+            });
+            
+            if (!foundMatch) {
+                // Try to parse filename to extract product details
+                const parts = filename.split('_');
+                let detectedCategory = null;
+                let productName = 'Unknown Product';
+                let price = null;
+                let description = 'Auto-generated from ImageKit';
+                
+                // Parse filename format: category_name_price_description_timestamp.ext
+                if (parts.length >= 4) {
+                    const categoryPrefix = parts[0].toLowerCase();
+                    productName = (parts[1] || 'Unknown Product').replace(/-/g, ' ');
+                    price = parts[2] && !isNaN(parts[2]) ? parseFloat(parts[2]) : null;
+                    description = (parts[3] || 'Auto-generated from ImageKit').replace(/-/g, ' ');
+                    
+                    // Map category prefixes back to full category names
+                    const categoryReverseMap = {
+                        'fridge': 'fridges',
+                        'clothwash': 'cloth-washers',
+                        'ac': 'acs',
+                        'fan': 'fans',
+                        'dishwash': 'dish-washers',
+                        'waterdispenser': 'water-dispensers',
+                        'other': 'other'
+                    };
+                    
+                    detectedCategory = categoryReverseMap[categoryPrefix];
+                } else {
+                    // Fallback to keyword detection for old files
+                    const lowerFilename = filename.toLowerCase();
+                    if (lowerFilename.includes('fridge') || lowerFilename.includes('refrigerator')) {
+                        detectedCategory = 'fridges';
+                    } else if (lowerFilename.includes('wash') || lowerFilename.includes('laundry') || lowerFilename.includes('cloth')) {
+                        detectedCategory = 'cloth-washers';
+                    } else if (lowerFilename.includes('ac') || lowerFilename.includes('air') || lowerFilename.includes('conditioner') || lowerFilename.includes('cooling')) {
+                        detectedCategory = 'acs';
+                    } else if (lowerFilename.includes('fan') || lowerFilename.includes('ventilat')) {
+                        detectedCategory = 'fans';
+                    } else if (lowerFilename.includes('dish') || lowerFilename.includes('dishwash')) {
+                        detectedCategory = 'dish-washers';
+                    } else if (lowerFilename.includes('water') || lowerFilename.includes('dispenser') || lowerFilename.includes('cooler')) {
+                        detectedCategory = 'water-dispensers';
+                    } else {
+                        detectedCategory = 'other';
+                    }
+                    
+                    // Extract name from filename if no structured format
+                    productName = filename.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+                }
+                
+                // Create the product automatically
+                if (detectedCategory) {
+                    const newId = Math.floor(Math.random() * 9000) + 1000;
+                    const imageUrl = `/api/images/${filename}`;
+                    
+                    const newProduct = {
+                        name: productName,
+                        id: newId.toString(),
+                        description: description,
+                        imageUrl: imageUrl,
+                        price: price
+                    };
+                    
+                    // Ensure category exists
+                    if (!products[detectedCategory]) {
+                        products[detectedCategory] = [];
+                    }
+                    
+                    // Add product to the category
+                    products[detectedCategory].push(newProduct);
+                    updatedCount++;
+                    
+                    console.log(`Auto-sync: Created product "${productName}" in ${detectedCategory} (ID: ${newId})`);
+                }
+            }
+        }
+        
+        // Save updated products if any were created
+        if (updatedCount > 0) {
+            await fs.writeFile(DATA_FILE, JSON.stringify(products, null, 2));
+            console.log(`Auto-sync: Successfully created ${updatedCount} new products`);
+        } else {
+            console.log('Auto-sync: No new products to create');
+        }
+        
+        return { 
+            success: true,
+            updatedCount: updatedCount,
+            totalFiles: imageKitFiles.length
+        };
+        
+    } catch (error) {
+        console.error('Auto-sync error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 // Start server
 async function startServer() {
     await initializeData();
+    
+    // Start auto-sync immediately and permanently
+    if (!isAutoSyncRunning) {
+        isAutoSyncRunning = true;
+        console.log('Starting permanent auto-sync...');
+        
+        // Run immediately first
+        await runAllImagesSync();
+        
+        // Then set up permanent interval
+        const runAutoSync = async () => {
+            if (!isAutoSyncRunning) return;
+            
+            console.log('Auto-sync: Running scheduled sync...');
+            await runAllImagesSync();
+            
+            // Schedule next run (random 1-5 minutes)
+            const nextRunDelay = Math.floor(Math.random() * 4 * 60 * 1000) + 60 * 1000; // 1-5 minutes
+            nextSyncTime = Date.now() + nextRunDelay;
+            console.log(`Auto-sync: Next run in ${Math.round(nextRunDelay / 1000 / 60)} minutes`);
+            
+            autoSyncInterval = setTimeout(runAutoSync, nextRunDelay);
+        };
+        
+        // Start the permanent cycle
+        const firstDelay = Math.floor(Math.random() * 4 * 60 * 1000) + 60 * 1000; // 1-5 minutes
+        nextSyncTime = Date.now() + firstDelay;
+        console.log(`Auto-sync: First scheduled run in ${Math.round(firstDelay / 1000 / 60)} minutes`);
+        autoSyncInterval = setTimeout(runAutoSync, firstDelay);
+        
+        console.log('✅ Permanent auto-sync started successfully');
+    }
+    
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running on http://0.0.0.0:${PORT}`);
         console.log('ImageKit endpoint:', IMAGEKIT_CONFIG.urlEndpoint);
+        console.log('🔄 Auto-sync is running permanently in the background');
     });
 }
 
